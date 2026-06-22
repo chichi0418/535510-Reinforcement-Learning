@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Homework 2 — DDPG, PPO, TRPO</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+  <link rel="stylesheet" href="_pdf_style.css" />
+  <script defer=""
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"
+  type="text/javascript"></script>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Homework 2 — DDPG, PPO, TRPO</h1>
+</header>
+<h1 id="homework-2-answer">Homework 2 Answer</h1>
+<h2 id="problem-1">Problem 1</h2>
+<p>Let</p>
+<p><span
+class="math display">\[r(\theta)=\frac{\pi_\theta(a|s)}{\pi_{\theta_k}(a|s)},
+\qquad A=A^{\pi_{\theta_k}}(s,a).\]</span></p>
+<p>The two objectives are</p>
+<p><span
+class="math display">\[L^{clip}_{s,a}(\theta;\theta_k)=\min(rA,\operatorname{clip}(r,1-\epsilon,1+\epsilon)A),\]</span></p>
+<p>and</p>
+<p><span class="math display">\[\tilde
+L^{clip}_{s,a}(\theta;\theta_k)=\operatorname{clip}(r,1-\epsilon,1+\epsilon)A.\]</span></p>
+<p>Their behavior differs because the original PPO objective uses the
+minimum to make the clipping pessimistic. The variant always uses the
+clipped ratio, even when doing so gives an optimistic value.</p>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 16%" />
+<col style="width: 22%" />
+<col style="width: 22%" />
+<col style="width: 22%" />
+<col style="width: 16%" />
+</colgroup>
+<thead>
+<tr>
+<th>Advantage sign</th>
+<th style="text-align: right;">Ratio region</th>
+<th style="text-align: right;">Original PPO objective</th>
+<th style="text-align: right;">Variant objective</th>
+<th>Behavioral effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><span class="math inline">\(A&gt;0\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(r&lt;1-\epsilon\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(rA\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\((1-\epsilon)A\)</span></td>
+<td>Original still rewards increasing <span
+class="math inline">\(r\)</span> toward the old policy ratio; variant is
+flat and gives no gradient.</td>
+</tr>
+<tr>
+<td><span class="math inline">\(A&gt;0\)</span></td>
+<td style="text-align: right;"><span class="math inline">\(1-\epsilon
+\le r \le 1+\epsilon\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(rA\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(rA\)</span></td>
+<td>Same objective and same gradient.</td>
+</tr>
+<tr>
+<td><span class="math inline">\(A&gt;0\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(r&gt;1+\epsilon\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\((1+\epsilon)A\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\((1+\epsilon)A\)</span></td>
+<td>Both are flat; increasing probability of a good action beyond the
+trust region is not rewarded.</td>
+</tr>
+<tr>
+<td><span class="math inline">\(A&lt;0\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(r&lt;1-\epsilon\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\((1-\epsilon)A\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\((1-\epsilon)A\)</span></td>
+<td>Both are flat; decreasing probability of a bad action too much is
+not further rewarded.</td>
+</tr>
+<tr>
+<td><span class="math inline">\(A&lt;0\)</span></td>
+<td style="text-align: right;"><span class="math inline">\(1-\epsilon
+\le r \le 1+\epsilon\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(rA\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(rA\)</span></td>
+<td>Same objective and same gradient.</td>
+</tr>
+<tr>
+<td><span class="math inline">\(A&lt;0\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(r&gt;1+\epsilon\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\(rA\)</span></td>
+<td style="text-align: right;"><span
+class="math inline">\((1+\epsilon)A\)</span></td>
+<td>Original keeps penalizing increases in probability of a bad action;
+variant is flat and stops correcting it.</td>
+</tr>
+</tbody>
+</table>
+<p>Therefore, the original objective clips only the policy changes that
+would improve the surrogate too much: too large <span
+class="math inline">\(r\)</span> for positive advantage and too small
+<span class="math inline">\(r\)</span> for negative advantage. If a
+change moves in the harmful direction, the original objective remains
+linear and keeps a gradient that pushes the policy back. The variant
+clips both directions symmetrically and can remove useful corrective
+gradients. This makes <span class="math inline">\(\tilde
+L^{clip}\)</span> less conservative in the PPO sense, because it can
+assign the clipped value even when the unclipped value is worse.</p>
+<p>Piecewise, the original PPO objective is</p>
+<p><span class="math display">\[
+L^{clip}_{s,a} =
+\begin{cases}
+rA, &amp; A&gt;0,\ r \le 1+\epsilon,\\
+(1+\epsilon)A, &amp; A&gt;0,\ r&gt;1+\epsilon,\\
+(1-\epsilon)A, &amp; A&lt;0,\ r&lt;1-\epsilon,\\
+rA, &amp; A&lt;0,\ r \ge 1-\epsilon.
+\end{cases}
+\]</span></p>
+<p>The variant is</p>
+<p><span class="math display">\[
+\tilde L^{clip}_{s,a} =
+\begin{cases}
+(1-\epsilon)A, &amp; r&lt;1-\epsilon,\\
+rA, &amp; 1-\epsilon \le r \le 1+\epsilon,\\
+(1+\epsilon)A, &amp; r&gt;1+\epsilon.
+\end{cases}
+\]</span></p>
+<p>The important plot-level difference is that, for <span
+class="math inline">\(A&gt;0\)</span>, original PPO is linear on the
+left and flat on the right, while the variant is flat on both sides. For
+<span class="math inline">\(A&lt;0\)</span>, original PPO is flat on the
+left and linear on the right, while the variant is again flat on both
+sides.</p>
+<figure>
+<img src="figures/p1_clip_objective.png"
+alt="PPO-clip objective comparison" />
+<figcaption aria-hidden="true">PPO-clip objective
+comparison</figcaption>
+</figure>
+<p><strong>Figure 1:</strong> PPO-clip objective vs the variant (<span
+class="math inline">\(\varepsilon=0.2\)</span>). Left (<span
+class="math inline">\(A&gt;0\)</span>): the original is linear for <span
+class="math inline">\(r&lt;1-\varepsilon\)</span> and flat for <span
+class="math inline">\(r&gt;1+\varepsilon\)</span>, while the variant is
+flat on <strong>both</strong> sides — it loses the corrective gradient
+that pushes <span class="math inline">\(r\)</span> back into the trust
+region when the new policy under-shoots. Right (<span
+class="math inline">\(A&lt;0\)</span>): the original is flat for <span
+class="math inline">\(r&lt;1-\varepsilon\)</span> and linear for <span
+class="math inline">\(r&gt;1+\varepsilon\)</span>, keeping a strong
+gradient that penalises increasing the probability of a bad action; the
+variant is again flat on both sides and stops correcting in this
+regime.</p>
+<h2 id="problem-2">Problem 2</h2>
+<h3 id="a">(a)</h3>
+<p>For the visited state <span class="math inline">\(s_t\)</span>, TD(0)
+updates</p>
+<p><span
+class="math display">\[V_{t+1}(s_t)=V_t(s_t)+\alpha_t(s_t)(r_t+\gamma
+V_t(s_{t+1})-V_t(s_t)).\]</span></p>
+<p>For any state <span class="math inline">\(s\ne s_t\)</span>, the
+estimate is unchanged:</p>
+<p><span class="math display">\[V_{t+1}(s)=V_t(s).\]</span></p>
+<p>Equivalently, for <span class="math inline">\(s\ne s_t\)</span> we
+may write</p>
+<p><span class="math display">\[V_{t+1}(s)=V_t(s)+\alpha_t(s)(r_t+\gamma
+V_t(s_{t+1})-V_t(s))\]</span></p>
+<p>with</p>
+<p><span class="math display">\[\alpha_t(s)=0.\]</span></p>
+<h3 id="b">(b)</h3>
+<p>Define the error process</p>
+<p><span class="math display">\[W_t(s)=V_t(s)-V^\pi(s).\]</span></p>
+<p>For <span class="math inline">\(s=s_t\)</span>,</p>
+<p><span
+class="math display">\[W_{t+1}(s_t)=W_t(s_t)+\alpha_t(s_t)(r_t+\gamma
+V_t(s_{t+1})-V_t(s_t)).\]</span></p>
+<p>To match Theorem 1,</p>
+<p><span
+class="math display">\[W_{t+1}(s_t)=(1-\alpha_t(s_t))W_t(s_t)+\alpha_t(s_t)\varepsilon_t(s_t),\]</span></p>
+<p>where</p>
+<p><span class="math display">\[\varepsilon_t(s_t)=r_t+\gamma
+V_t(s_{t+1})-V^\pi(s_t).\]</span></p>
+<p>For <span class="math inline">\(s\ne s_t\)</span>, <span
+class="math inline">\(\alpha_t(s)=0\)</span>, <span
+class="math inline">\(W_t(s)=V_t(s)-V^\pi(s)\)</span>, and <span
+class="math inline">\(\varepsilon_t(s)\)</span> can be chosen
+arbitrarily because it is multiplied by zero. A convenient choice is</p>
+<p><span class="math display">\[\varepsilon_t(s)=0.\]</span></p>
+<h3 id="c">(c)</h3>
+<p>For the visited state <span class="math inline">\(s_t=s\)</span>,
+condition on the history <span class="math inline">\(\mathcal
+H_t\)</span>. Since <span class="math inline">\(V^\pi\)</span> satisfies
+the Bellman equation,</p>
+<p><span class="math display">\[V^\pi(s)=\mathbb E[r_t+\gamma
+V^\pi(s_{t+1})\mid s_t=s,\mathcal H_t].\]</span></p>
+<p>Thus</p>
+<p><span class="math display">\[
+\begin{aligned}
+\mathbb E[\varepsilon_t(s)\mid\mathcal H_t]
+&amp;=\mathbb E[r_t+\gamma V_t(s_{t+1})-V^\pi(s)\mid\mathcal H_t]\\
+&amp;=\gamma\mathbb E[V_t(s_{t+1})-V^\pi(s_{t+1})\mid\mathcal H_t]\\
+&amp;=\gamma\mathbb E[W_t(s_{t+1})\mid\mathcal H_t].
+\end{aligned}
+\]</span></p>
+<p>Therefore,</p>
+<p><span class="math display">\[\left|\mathbb
+E[\varepsilon_t(s)\mid\mathcal H_t]\right|
+\le \gamma \|W_t\|_\infty.\]</span></p>
+<p>Because <span class="math inline">\(\gamma\in(0,1)\)</span>,
+condition (C2) holds with <span
+class="math inline">\(\rho=\gamma\)</span>.</p>
+<p>For (C3), assume the finite MDP has bounded rewards, so <span
+class="math inline">\(|r_t|\le R_{\max}\)</span>. Then</p>
+<p><span class="math display">\[
+|\varepsilon_t(s)|
+=|r_t+\gamma V_t(s_{t+1})-V^\pi(s)|.
+\]</span></p>
+<p>Using <span class="math inline">\(V_t=V^\pi+W_t\)</span>,</p>
+<p><span class="math display">\[
+|\varepsilon_t(s)|
+\le R_{\max}+\gamma
+\|V^\pi\|_\infty+\gamma\|W_t\|_\infty+\|V^\pi\|_\infty.
+\]</span></p>
+<p>Since <span class="math inline">\(\|V^\pi\|_\infty\le
+R_{\max}/(1-\gamma)\)</span>, there is a finite constant <span
+class="math inline">\(K\)</span> such that</p>
+<p><span class="math display">\[|\varepsilon_t(s)|\le
+K(1+\|W_t\|_\infty).\]</span></p>
+<p>Hence</p>
+<p><span class="math display">\[\mathbb V[\varepsilon_t(s)\mid\mathcal
+H_t]\le
+\mathbb E[\varepsilon_t(s)^2\mid\mathcal H_t]\le
+K^2(1+\|W_t\|_\infty)^2,\]</span></p>
+<p>so (C3) holds with <span class="math inline">\(C=K^2\)</span>. For
+<span class="math inline">\(s\ne s_t\)</span>, <span
+class="math inline">\(\alpha_t(s)=0\)</span>, so those coordinates are
+not updated at time <span class="math inline">\(t\)</span> and the same
+bound is harmless.</p>
+<h3 id="d">(d)</h3>
+<p>By (a) and (b), the TD(0) error process can be written in the
+stochastic approximation form</p>
+<p><span
+class="math display">\[W_{t+1}(s)=(1-\alpha_t(s))W_t(s)+\alpha_t(s)\varepsilon_t(s).\]</span></p>
+<p>Part (c) shows that (C2) and (C3) hold. If (C1) also holds, then
+Theorem 1 implies</p>
+<p><span class="math display">\[W_t(s)\to 0 \qquad \text{for every }
+s\in S \text{ almost surely.}\]</span></p>
+<p>Since <span class="math inline">\(W_t(s)=V_t(s)-V^\pi(s)\)</span>,
+this gives</p>
+<p><span class="math display">\[V_t(s)\to V^\pi(s) \qquad \text{for
+every } s\in S \text{ almost surely.}\]</span></p>
+<h2 id="problem-3">Problem 3</h2>
+<p>Let</p>
+<p><span class="math display">\[g=\nabla_\theta
+L_{\theta_k}(\theta)\big|_{\theta=\theta_k}, \qquad
+x=\theta-\theta_k.\]</span></p>
+<p>The primal problem is</p>
+<p><span class="math display">\[\min_x -g^\top x \quad \text{s.t.}\quad
+\frac12 x^\top Hx-\delta\le 0.\]</span></p>
+<p>The Lagrangian is</p>
+<p><span class="math display">\[L(x,\lambda)=-g^\top
+x+\lambda\left(\frac12x^\top Hx-\delta\right).\]</span></p>
+<h3 id="a-1">(a)</h3>
+<p>For <span class="math inline">\(\lambda&gt;0\)</span>, minimize the
+Lagrangian over <span class="math inline">\(x\)</span>. The first-order
+condition is</p>
+<p><span class="math display">\[\nabla_x L(x,\lambda)=-g+\lambda
+Hx=0,\]</span></p>
+<p>so</p>
+<p><span class="math display">\[x(\lambda)=\frac1\lambda
+H^{-1}g.\]</span></p>
+<p>Substituting this into the Lagrangian,</p>
+<p><span class="math display">\[
+\begin{aligned}
+D(\lambda)
+&amp;=-g^\top\left(\frac1\lambda H^{-1}g\right)
++\lambda\left(\frac12\left(\frac1\lambda H^{-1}g\right)^\top H
+\left(\frac1\lambda H^{-1}g\right)-\delta\right)\\
+&amp;=-\frac1\lambda g^\top H^{-1}g+\frac1{2\lambda}g^\top
+H^{-1}g-\lambda\delta\\
+&amp;=-\frac1{2\lambda}g^\top H^{-1}g-\lambda\delta.
+\end{aligned}
+\]</span></p>
+<p>This is Equation (11). To maximize over <span
+class="math inline">\(\lambda&gt;0\)</span>, differentiate:</p>
+<p><span
+class="math display">\[D&#39;(\lambda)=\frac{1}{2\lambda^2}g^\top
+H^{-1}g-\delta.\]</span></p>
+<p>Setting <span class="math inline">\(D&#39;(\lambda)=0\)</span>
+gives</p>
+<p><span class="math display">\[\lambda^*=\sqrt{\frac{g^\top
+H^{-1}g}{2\delta}}.\]</span></p>
+<h3 id="b-1">(b)</h3>
+<p>By strong duality, the primal optimizer minimizes <span
+class="math inline">\(L(x,\lambda^*)\)</span>, so</p>
+<p><span
+class="math display">\[x^*=\frac1{\lambda^*}H^{-1}g.\]</span></p>
+<p>Therefore,</p>
+<p><span class="math display">\[\theta^*=\theta_k+\alpha
+H^{-1}_{\theta_k}\nabla_\theta
+L_{\theta_k}(\theta)\big|_{\theta=\theta_k},\]</span></p>
+<p>where</p>
+<p><span
+class="math display">\[\alpha=\frac1{\lambda^*}=\sqrt{\frac{2\delta}{g^\top
+H^{-1}g}}.\]</span></p>
+<h2 id="problem-4">Problem 4</h2>
+<h3 id="ddpg-implementation-for-pendulum-v1">DDPG implementation for
+<code>Pendulum-v1</code></h3>
+<p>The completed <code>ddpg.py</code> implements the following DDPG
+components.</p>
+<table>
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<thead>
+<tr>
+<th>Component</th>
+<th>Implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Actor</td>
+<td>Two hidden ReLU layers followed by <code>tanh</code>; the output is
+scaled to the environment action bounds.</td>
+</tr>
+<tr>
+<td>Critic</td>
+<td>Concatenates state and action, then uses two hidden ReLU layers and
+outputs one scalar Q-value.</td>
+</tr>
+<tr>
+<td>Exploration</td>
+<td>Ornstein-Uhlenbeck noise is added to actor actions during training
+and clipped to action bounds.</td>
+</tr>
+<tr>
+<td>Critic target</td>
+<td><span class="math inline">\(y=r+\gamma(1-d)Q_{\bar
+w}(s&#39;,\pi_{\bar\theta}(s&#39;))\)</span>.</td>
+</tr>
+<tr>
+<td>Critic loss</td>
+<td>Mean squared Bellman error.</td>
+</tr>
+<tr>
+<td>Actor loss</td>
+<td><span class="math inline">\(-\mathbb
+E_s[Q_w(s,\pi_\theta(s))]\)</span>.</td>
+</tr>
+<tr>
+<td>Target update</td>
+<td>Soft update with coefficient <span
+class="math inline">\(\tau\)</span>.</td>
+</tr>
+<tr>
+<td>Replay buffer</td>
+<td>Uniform random replay buffer sampling.</td>
+</tr>
+</tbody>
+</table>
+<p>The hyperparameters currently used in <code>ddpg.py</code> are:</p>
+<table>
+<thead>
+<tr>
+<th>Hyperparameter</th>
+<th style="text-align: right;">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Environment</td>
+<td style="text-align: right;"><code>Pendulum-v1</code></td>
+</tr>
+<tr>
+<td>Episodes</td>
+<td style="text-align: right;">300</td>
+</tr>
+<tr>
+<td>Discount factor <span class="math inline">\(\gamma\)</span></td>
+<td style="text-align: right;">0.99</td>
+</tr>
+<tr>
+<td>Target update <span class="math inline">\(\tau\)</span></td>
+<td style="text-align: right;">0.005</td>
+</tr>
+<tr>
+<td>Hidden size</td>
+<td style="text-align: right;">256</td>
+</tr>
+<tr>
+<td>Actor learning rate</td>
+<td style="text-align: right;">1e-4</td>
+</tr>
+<tr>
+<td>Critic learning rate</td>
+<td style="text-align: right;">3e-4</td>
+</tr>
+<tr>
+<td>Replay buffer size</td>
+<td style="text-align: right;">1,000,000</td>
+</tr>
+<tr>
+<td>Batch size</td>
+<td style="text-align: right;">128</td>
+</tr>
+<tr>
+<td>Warmup steps</td>
+<td style="text-align: right;">1,000</td>
+</tr>
+<tr>
+<td>Updates per environment step</td>
+<td style="text-align: right;">1</td>
+</tr>
+<tr>
+<td>Exploration noise scale</td>
+<td style="text-align: right;">linearly annealed from 0.2 to 0.05</td>
+</tr>
+<tr>
+<td>Random seed</td>
+<td style="text-align: right;">42</td>
+</tr>
+</tbody>
+</table>
+<p>Local correctness checks:</p>
+<ol type="1">
+<li><code>ddpg.py</code> compiles successfully under the HW1 virtual
+environment Python interpreter.</li>
+<li>A smoke test on <code>Pendulum-v1</code> constructs the agent,
+samples an action, verifies that the action is inside the environment
+action bounds, and runs one actor/critic update on a synthetic batch
+with finite losses.</li>
+</ol>
+<p>The Pendulum run was first logged offline and then synced to W&amp;B
+after login.</p>
+<p>Run command:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> /Users/jacky/nycu/senior/RL/hw/hw2</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">venv/bin/python</span> ddpg.py</span></code></pre></div>
+<p>Training result from the 300-episode run:</p>
+<table>
+<colgroup>
+<col style="width: 42%" />
+<col style="width: 57%" />
+</colgroup>
+<thead>
+<tr>
+<th>Metric</th>
+<th style="text-align: right;">Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Best saved EWMA training score</td>
+<td style="text-align: right;">-141.96</td>
+</tr>
+<tr>
+<td>W&amp;B run final 20-episode evaluation score</td>
+<td style="text-align: right;">-172.66</td>
+</tr>
+<tr>
+<td>Re-evaluated final checkpoint over 20 episodes</td>
+<td style="text-align: right;">-109.91</td>
+</tr>
+<tr>
+<td>Saved actor checkpoint</td>
+<td
+style="text-align: right;"><code>preTrained/ddpg_actor_Pendulum-v1_ep299_score-142.0.pth</code></td>
+</tr>
+<tr>
+<td>Saved critic checkpoint</td>
+<td
+style="text-align: right;"><code>preTrained/ddpg_critic_Pendulum-v1_ep299_score-142.0.pth</code></td>
+</tr>
+<tr>
+<td>W&amp;B synced run</td>
+<td
+style="text-align: right;">https://wandb.ai/chichi-cs12-national-yang-ming-chiao-tung-university/ddpg/runs/wroa9y90</td>
+</tr>
+</tbody>
+</table>
+<p>Because <code>Pendulum-v1</code> starts from randomized initial
+states, the 20-episode evaluation score has noticeable variance. The
+final checkpoint was re-evaluated and obtained an average score of
+-109.91 over 20 episodes, which is better than the suggested target of
+approximately -130.</p>
+<h3 id="ddpg-implementation-for-halfcheetah-v5">DDPG implementation for
+<code>HalfCheetah-v5</code></h3>
+<p>The file <code>ddpg_cheetah.py</code> adapts the DDPG implementation
+to the MuJoCo <code>HalfCheetah-v5</code> task. It uses the same
+actor-critic structure, a replay buffer, target networks, soft target
+updates, and deterministic policy gradient updates. Exploration uses
+Gaussian action noise clipped to the action bounds.</p>
+<p>Run command for the required 500k environment steps:</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> /Users/jacky/nycu/senior/RL/hw/hw2</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">venv/bin/python</span> ddpg_cheetah.py <span class="at">--max-steps</span> 500000 <span class="at">--eval-episodes</span> 20 <span class="at">--wandb-mode</span> online</span></code></pre></div>
+<p>The online rerun used:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">venv/bin/python</span> ddpg_cheetah.py <span class="at">--out-dir</span> preTrained_online <span class="at">--run-name</span> ddpg_cheetah_online_seed42 <span class="at">--wandb-mode</span> online</span></code></pre></div>
+<p>The script saves best, periodic, and final checkpoints under the
+selected output directory.</p>
+<p>Default hyperparameters:</p>
+<table>
+<thead>
+<tr>
+<th>Hyperparameter</th>
+<th style="text-align: right;">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Environment</td>
+<td style="text-align: right;"><code>HalfCheetah-v5</code></td>
+</tr>
+<tr>
+<td>Environment steps</td>
+<td style="text-align: right;">500,000</td>
+</tr>
+<tr>
+<td>Discount factor <span class="math inline">\(\gamma\)</span></td>
+<td style="text-align: right;">0.99</td>
+</tr>
+<tr>
+<td>Target update <span class="math inline">\(\tau\)</span></td>
+<td style="text-align: right;">0.005</td>
+</tr>
+<tr>
+<td>Hidden size</td>
+<td style="text-align: right;">256</td>
+</tr>
+<tr>
+<td>Actor learning rate</td>
+<td style="text-align: right;">3e-4</td>
+</tr>
+<tr>
+<td>Critic learning rate</td>
+<td style="text-align: right;">3e-4</td>
+</tr>
+<tr>
+<td>Replay buffer size</td>
+<td style="text-align: right;">1,000,000</td>
+</tr>
+<tr>
+<td>Batch size</td>
+<td style="text-align: right;">256</td>
+</tr>
+<tr>
+<td>Random exploration steps</td>
+<td style="text-align: right;">10,000</td>
+</tr>
+<tr>
+<td>Exploration noise std</td>
+<td style="text-align: right;">0.1 times action bound</td>
+</tr>
+<tr>
+<td>Evaluation frequency</td>
+<td style="text-align: right;">every 10,000 steps</td>
+</tr>
+<tr>
+<td>Evaluation episodes</td>
+<td style="text-align: right;">20</td>
+</tr>
+<tr>
+<td>Random seed</td>
+<td style="text-align: right;">42</td>
+</tr>
+</tbody>
+</table>
+<p>Training result from the 500k-step run:</p>
+<table>
+<colgroup>
+<col style="width: 42%" />
+<col style="width: 57%" />
+</colgroup>
+<thead>
+<tr>
+<th>Metric</th>
+<th style="text-align: right;">Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Best average evaluation score over 20 episodes</td>
+<td style="text-align: right;">8536.79</td>
+</tr>
+<tr>
+<td>Final average evaluation score over 20 episodes</td>
+<td style="text-align: right;">8536.79</td>
+</tr>
+<tr>
+<td>Step where best score occurs</td>
+<td style="text-align: right;">500,000</td>
+</tr>
+<tr>
+<td>Saved actor checkpoint</td>
+<td
+style="text-align: right;"><code>preTrained_online/ddpg_actor_HalfCheetah-v5_best_step500000_score8536.8.pth</code></td>
+</tr>
+<tr>
+<td>Saved critic checkpoint</td>
+<td
+style="text-align: right;"><code>preTrained_online/ddpg_critic_HalfCheetah-v5_best_step500000_score8536.8.pth</code></td>
+</tr>
+<tr>
+<td>Final actor checkpoint</td>
+<td
+style="text-align: right;"><code>preTrained_online/ddpg_actor_HalfCheetah-v5_final.pth</code></td>
+</tr>
+<tr>
+<td>Final critic checkpoint</td>
+<td
+style="text-align: right;"><code>preTrained_online/ddpg_critic_HalfCheetah-v5_final.pth</code></td>
+</tr>
+<tr>
+<td>W&amp;B run</td>
+<td
+style="text-align: right;">https://wandb.ai/chichi-cs12-national-yang-ming-chiao-tung-university/ddpg-halfcheetah/runs/rxkfkqsc</td>
+</tr>
+</tbody>
+</table>
+<p>The vanilla DDPG online run reached the required average evaluation
+score of 5,000 by 150k steps and stayed above the requirement for the
+rest of training. The best observed score, 8536.79, is within the
+expected 6,000-10,000 range stated in the assignment.</p>
+<p>W&amp;B snapshots for the vanilla DDPG run:</p>
+<figure>
+<img src="4b/overview.png" alt="W&amp;B run overview (vanilla DDPG)" />
+<figcaption aria-hidden="true">W&amp;B run overview (vanilla
+DDPG)</figcaption>
+</figure>
+<figure>
+<img src="4b/eval-mean_return.png"
+alt="W&amp;B eval/mean_return panel (vanilla DDPG)" />
+<figcaption aria-hidden="true">W&amp;B eval/mean_return panel (vanilla
+DDPG)</figcaption>
+</figure>
+<h3 id="ddpg-with-clipped-double-q-for-halfcheetah-v5">DDPG with Clipped
+Double Q for <code>HalfCheetah-v5</code></h3>
+<p>The file <code>ddpg_cdq_cheetah.py</code> implements the clipped
+double-Q enhancement. It keeps two critic networks <span
+class="math inline">\(Q_{w_1}\)</span> and <span
+class="math inline">\(Q_{w_2}\)</span> and two target critics. For
+critic targets, the code computes</p>
+<p><span class="math display">\[
+y = r + \gamma(1-d)\min_{i=1,2}Q_{\bar w_i}(s&#39;,
+\pi_{\bar\theta}(s&#39;) + \epsilon),
+\]</span></p>
+<p>where the target action noise is clipped and the final target action
+is clipped to the action bounds. Each critic is trained against the same
+clipped-double-Q target, and the actor is updated to maximize <span
+class="math inline">\(Q_{w_1}(s,\pi_\theta(s))\)</span>.</p>
+<p>Run command for the required 500k environment steps:</p>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> /Users/jacky/nycu/senior/RL/hw/hw2</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="ex">venv/bin/python</span> ddpg_cdq_cheetah.py <span class="at">--max-steps</span> 500000 <span class="at">--eval-episodes</span> 20 <span class="at">--wandb-mode</span> online</span></code></pre></div>
+<p>The online rerun used:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">venv/bin/python</span> ddpg_cdq_cheetah.py <span class="at">--out-dir</span> preTrained_online <span class="at">--run-name</span> ddpg_cdq_cheetah_online_seed42 <span class="at">--wandb-mode</span> online</span></code></pre></div>
+<p>Default hyperparameters:</p>
+<table>
+<thead>
+<tr>
+<th>Hyperparameter</th>
+<th style="text-align: right;">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Environment</td>
+<td style="text-align: right;"><code>HalfCheetah-v5</code></td>
+</tr>
+<tr>
+<td>Environment steps</td>
+<td style="text-align: right;">500,000</td>
+</tr>
+<tr>
+<td>Discount factor <span class="math inline">\(\gamma\)</span></td>
+<td style="text-align: right;">0.99</td>
+</tr>
+<tr>
+<td>Target update <span class="math inline">\(\tau\)</span></td>
+<td style="text-align: right;">0.005</td>
+</tr>
+<tr>
+<td>Hidden size</td>
+<td style="text-align: right;">256</td>
+</tr>
+<tr>
+<td>Actor learning rate</td>
+<td style="text-align: right;">3e-4</td>
+</tr>
+<tr>
+<td>Critic learning rate</td>
+<td style="text-align: right;">3e-4</td>
+</tr>
+<tr>
+<td>Replay buffer size</td>
+<td style="text-align: right;">1,000,000</td>
+</tr>
+<tr>
+<td>Batch size</td>
+<td style="text-align: right;">256</td>
+</tr>
+<tr>
+<td>Random exploration steps</td>
+<td style="text-align: right;">10,000</td>
+</tr>
+<tr>
+<td>Exploration noise std</td>
+<td style="text-align: right;">0.1 times action bound</td>
+</tr>
+<tr>
+<td>Target policy noise std</td>
+<td style="text-align: right;">0.2 times action bound</td>
+</tr>
+<tr>
+<td>Target policy noise clip</td>
+<td style="text-align: right;">0.5 times action bound</td>
+</tr>
+<tr>
+<td>Actor update frequency</td>
+<td style="text-align: right;">every critic update</td>
+</tr>
+<tr>
+<td>Evaluation frequency</td>
+<td style="text-align: right;">every 10,000 steps</td>
+</tr>
+<tr>
+<td>Evaluation episodes</td>
+<td style="text-align: right;">20</td>
+</tr>
+<tr>
+<td>Random seed</td>
+<td style="text-align: right;">42</td>
+</tr>
+</tbody>
+</table>
+<p>Training result from the 500k-step run:</p>
+<table>
+<colgroup>
+<col style="width: 42%" />
+<col style="width: 57%" />
+</colgroup>
+<thead>
+<tr>
+<th>Metric</th>
+<th style="text-align: right;">Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Best CDQ average evaluation score over 20 episodes</td>
+<td style="text-align: right;">8223.49</td>
+</tr>
+<tr>
+<td>Final CDQ average evaluation score over 20 episodes</td>
+<td style="text-align: right;">8091.27</td>
+</tr>
+<tr>
+<td>Step where best score occurs</td>
+<td style="text-align: right;">490,000</td>
+</tr>
+<tr>
+<td>Saved actor checkpoint</td>
+<td
+style="text-align: right;"><code>preTrained_online/ddpg_cdq_actor_HalfCheetah-v5_best_step490000_score8223.5.pth</code></td>
+</tr>
+<tr>
+<td>Saved critics checkpoint</td>
+<td
+style="text-align: right;"><code>preTrained_online/ddpg_cdq_critics_HalfCheetah-v5_best_step490000_score8223.5.pth</code></td>
+</tr>
+<tr>
+<td>Final actor checkpoint</td>
+<td
+style="text-align: right;"><code>preTrained_online/ddpg_cdq_actor_HalfCheetah-v5_final.pth</code></td>
+</tr>
+<tr>
+<td>Final critics checkpoint</td>
+<td
+style="text-align: right;"><code>preTrained_online/ddpg_cdq_critics_HalfCheetah-v5_final.pth</code></td>
+</tr>
+<tr>
+<td>W&amp;B run</td>
+<td
+style="text-align: right;">https://wandb.ai/chichi-cs12-national-yang-ming-chiao-tung-university/ddpg-cdq-halfcheetah/runs/lvdt216v</td>
+</tr>
+</tbody>
+</table>
+<p>Compared with vanilla DDPG, the CDQ run crossed the 5,000 threshold
+earlier, at 110k steps, while vanilla DDPG crossed it at 150k steps. In
+this online seed, vanilla DDPG obtained the higher final and peak score,
+8536.79, while CDQ peaked at 8223.49 and finished at 8091.27. The CDQ
+curve improved steadily in the late stage and stayed close to its peak
+after 470k steps, which is consistent with clipped double Q reducing
+positive Q-value overestimation through the minimum of two target
+critics. Both HalfCheetah runs were synced online to W&amp;B using the
+run links listed above.</p>
+<figure>
+<img src="figures/p4_eval_compare.png"
+alt="Eval comparison: vanilla DDPG vs DDPG+CDQ on HalfCheetah-v5" />
+<figcaption aria-hidden="true">Eval comparison: vanilla DDPG vs DDPG+CDQ
+on HalfCheetah-v5</figcaption>
+</figure>
+<p><strong>Figure 2:</strong> 20-episode evaluation return on
+<code>HalfCheetah-v5</code> for vanilla DDPG (blue) and DDPG with
+Clipped Double Q (orange); shaded bands are ±1 std across the 20
+evaluation episodes. CDQ crosses the 5,000 target ~40k steps earlier and
+is markedly more stable: vanilla DDPG suffers a large drawdown around
+step 130k (a known symptom of optimistic Q-bias) before recovering,
+while CDQ has only a small wobble at ~120k and a brief dip at ~350k.
+Vanilla ends slightly higher at 500k.</p>
+<figure>
+<img src="figures/p4_critic_loss_compare.png"
+alt="Critic Bellman loss: vanilla critic vs CDQ critic1/critic2" />
+<figcaption aria-hidden="true">Critic Bellman loss: vanilla critic vs
+CDQ critic1/critic2</figcaption>
+</figure>
+<p><strong>Figure 3:</strong> Critic Bellman loss (smoothed, log scale).
+The two CDQ critics track each other closely throughout, confirming that
+taking the minimum of two independently trained <span
+class="math inline">\(Q\)</span>-targets is a real ensemble (the critics
+do disagree in their raw values even though their losses are similar).
+The vanilla critic converges to a slightly lower steady-state loss than
+either CDQ critic, but this lower loss does not translate into a more
+reliable evaluation curve — consistent with the well-known finding that
+vanilla DDPG’s lower TD error can come from fitting an over-estimated
+bootstrap target.</p>
+<p>W&amp;B snapshots for the CDQ run:</p>
+<figure>
+<img src="4c/overview.png" alt="W&amp;B run overview (DDPG + CDQ)" />
+<figcaption aria-hidden="true">W&amp;B run overview (DDPG +
+CDQ)</figcaption>
+</figure>
+<figure>
+<img src="4c/eval-mean_return.png"
+alt="W&amp;B eval/mean_return panel (DDPG + CDQ)" />
+<figcaption aria-hidden="true">W&amp;B eval/mean_return panel (DDPG +
+CDQ)</figcaption>
+</figure>
+<h3 id="code-correctness-checks">Code correctness checks</h3>
+<p>The source files were checked with the HW2 virtual environment:</p>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">venv/bin/python</span> <span class="at">-m</span> py_compile ddpg.py ddpg_cheetah.py ddpg_cdq_cheetah.py</span></code></pre></div>
+<p>Smoke tests were also run with short HalfCheetah rollouts to verify
+that environment interaction, replay buffer sampling, and actor/critic
+updates execute with finite losses.</p>
+</body>
+</html>

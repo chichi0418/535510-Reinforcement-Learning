@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="420" viewBox="0 0 720 420" role="img" aria-labelledby="title desc">
+  <title id="title">HalfCheetah online evaluation curve</title>
+  <desc id="desc">Evaluation mean return over 20 episodes for online DDPG and DDPG-CDQ runs.</desc>
+  <rect width="720" height="420" fill="#ffffff"/>
+  <text x="360" y="28" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#111827">HalfCheetah-v5 Online Evaluation Return</text>
+  <line x1="70" y1="350" x2="650" y2="350" stroke="#111827" stroke-width="1.5"/>
+  <line x1="70" y1="50" x2="70" y2="350" stroke="#111827" stroke-width="1.5"/>
+  <g font-family="Arial, sans-serif" font-size="12" fill="#374151">
+    <line x1="70" y1="350" x2="650" y2="350" stroke="#e5e7eb"/>
+    <line x1="70" y1="250" x2="650" y2="250" stroke="#e5e7eb"/>
+    <line x1="70" y1="150" x2="650" y2="150" stroke="#e5e7eb"/>
+    <line x1="70" y1="50" x2="650" y2="50" stroke="#e5e7eb"/>
+    <text x="58" y="354" text-anchor="end">0</text>
+    <text x="58" y="254" text-anchor="end">3000</text>
+    <text x="58" y="154" text-anchor="end">6000</text>
+    <text x="58" y="54" text-anchor="end">9000</text>
+    <text x="70" y="372" text-anchor="middle">0</text>
+    <text x="186" y="372" text-anchor="middle">100k</text>
+    <text x="302" y="372" text-anchor="middle">200k</text>
+    <text x="418" y="372" text-anchor="middle">300k</text>
+    <text x="534" y="372" text-anchor="middle">400k</text>
+    <text x="650" y="372" text-anchor="middle">500k</text>
+    <text x="360" y="400" text-anchor="middle" font-size="13">Environment steps</text>
+    <text transform="translate(18 205) rotate(-90)" text-anchor="middle" font-size="13">Mean return</text>
+  </g>
+  <polyline fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"
+    points="82,350 128,251 186,196 244,169 302,131 360,111 418,105 476,90 534,81 592,72 650,65"/>
+  <polyline fill="none" stroke="#dc2626" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"
+    points="82,350 128,249 186,184 244,163 302,151 360,139 418,125 476,127 534,93 592,87 638,76 650,80"/>
+  <g font-family="Arial, sans-serif" font-size="13" fill="#111827">
+    <rect x="470" y="60" width="160" height="54" fill="#ffffff" stroke="#d1d5db"/>
+    <line x1="486" y1="78" x2="526" y2="78" stroke="#2563eb" stroke-width="3"/>
+    <text x="536" y="82">DDPG online</text>
+    <line x1="486" y1="100" x2="526" y2="100" stroke="#dc2626" stroke-width="3"/>
+    <text x="536" y="104">DDPG-CDQ online</text>
+  </g>
+</svg>

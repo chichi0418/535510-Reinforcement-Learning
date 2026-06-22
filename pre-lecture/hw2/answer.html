@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>
+MathJax = {
+  tex: { inlineMath: [['$','$']], displayMath: [['$$','$$']] },
+  options: { skipHtmlTags: ['script','noscript','style','textarea','pre'] }
+};
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+<style>
+  @page { size: A4; margin: 12mm 12mm 10mm 12mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Times New Roman", Times, serif;
+    font-size: 9.2pt;
+    line-height: 1.35;
+    margin: 0; padding: 0;
+    width: 186mm;
+  }
+  h1 { font-size: 12pt; margin: 0 0 4px 0; border-bottom: 1.5px solid #333; padding-bottom: 2px; }
+  h2 { font-size: 10.5pt; margin: 6px 0 2px 0; }
+  h3 { font-size: 9.5pt; margin: 4px 0 1px 0; }
+  p { margin: 2px 0 3px 0; }
+  ul { margin: 2px 0; padding-left: 18px; }
+  li { margin: 1px 0; }
+  hr { margin: 5px 0; border: none; border-top: 1px solid #aaa; }
+  table { border-collapse: collapse; width: 100%; font-size: 8.8pt; }
+  th, td { border: 1px solid #666; padding: 2px 5px; }
+  th { background: #eee; }
+  code { font-family: monospace; font-size: 8pt; background: #f4f4f4; padding: 0 2px; }
+  .mjx-chtml { font-size: 96% !important; }
+</style>
+</head>
+<body>
+
+<h1>Pre-Lecture Assignment 2 — Answers</h1>
+
+<h2>Q1 — Non-uniform Polyak-Łojasiewicz (PL)</h2>
+
+<h3>(a) Why "non-uniform"?</h3>
+<p>In the standard (uniform) PL condition, the gradient lower bounds the optimality gap with a <strong>constant</strong> coefficient independent of $\theta$. Here, the coefficient</p>
+<p style="text-align:center">$C(\theta) = \dfrac{\min_{s} \pi_\theta(a^*(s) \mid s)}{\sqrt{S} \cdot \|d_\rho^{\pi^*}/d_\mu^{\pi_\theta}\|_\infty}$</p>
+<p><strong>depends on $\theta$</strong>: both $\min_s \pi_\theta(a^*(s)|s)$ and $d_\mu^{\pi_\theta}$ change as the policy updates. The PL "constant" is non-uniform across parameter space — large when $\pi_\theta$ is near-optimal, vanishingly small otherwise.</p>
+
+<h3>(b) Origin of $\min_s \pi_\theta(a^*(s) \mid s)$</h3>
+<p>The proof of Lemma 8 proceeds in three key steps:</p>
+<p><strong>Step 1 — Restrict to optimal-action coordinates (Cauchy-Schwarz):</strong></p>
+$$\left\|\nabla_\theta V^{\pi_\theta}(\mu)\right\|_2 \;\geq\; \frac{1}{\sqrt{S}}\sum_s \left|\frac{\partial V^{\pi_\theta}(\mu)}{\partial \theta_{s,\,a^*(s)}}\right|$$
+<p><strong>Step 2 — Substitute softmax PG formula (Lemma 1):</strong>
+$\dfrac{\partial V^{\pi_\theta}(\mu)}{\partial \theta_{s,a}} = \dfrac{1}{1-\gamma} d_\mu^{\pi_\theta}(s)\,\pi_\theta(a|s)\,A^{\pi_\theta}(s,a)$.
+At $a=a^*(s)$, the factor $\pi_\theta(a^*(s)|s)$ appears inside the sum — it comes from the policy probability in the softmax gradient.</p>
+<p><strong>Step 3 — Extract min to apply the performance difference lemma:</strong></p>
+$$\sum_s d_\mu^{\pi_\theta}(s)\,\pi_\theta(a^*(s)|s)\,A^{\pi_\theta}(s,a^*(s)) \;\geq\; \min_s\pi_\theta(a^*(s)|s)\cdot\sum_s d_\mu^{\pi_\theta}(s)\,A^{\pi_\theta}(s,a^*(s))$$
+<p>Pulling out the min makes the remaining sum convertible to $V^*(\rho)-V^{\pi_\theta}(\rho)$ via the performance difference lemma. In summary: $\min_s\pi_\theta(a^*(s)|s)$ originates from the <strong>softmax gradient formula</strong> (Step 2) and is <strong>extracted via a min lower-bound</strong> (Step 3) to enable the final conversion to the optimality gap.</p>
+
+<h3>(c) Difference between $\mu$ and $\rho$</h3>
+<ul>
+  <li>$\mu$: initial state distribution for <strong>gradient computation</strong> — determines $d_\mu^{\pi_\theta}$ used in the policy gradient update.</li>
+  <li>$\rho$: initial state distribution for <strong>performance evaluation</strong> — the optimality gap $V^*(\rho) - V^{\pi_\theta}(\rho)$ is measured under $\rho$.</li>
+</ul>
+<p>They can differ. The ratio $\|d_\rho^{\pi^*}/d_\mu^{\pi_\theta}\|_\infty$ captures the distribution mismatch between training ($\mu$) and evaluation ($\rho$) — the larger it is, the harder convergence becomes.</p>
+
+<hr>
+
+<h2>Q2 — QAC Algorithm (Lines 100–119)</h2>
+
+<h3>(a) Math Equations</h3>
+<p><strong>Critic forward (L101–102):</strong> $Q_w(s_t, a_t) = [\mathrm{critic}(s_t)]_{a_t}$</p>
+<p><strong>TD target (L104–112) — Expected SARSA:</strong></p>
+$$\hat{V}^{\pi_\theta}(s_{t+1}) = \sum_{a} \pi_\theta(a \mid s_{t+1})\, Q_w(s_{t+1}, a), \qquad y_t = \begin{cases} r_t & \text{if done} \\ r_t + \gamma\, \hat{V}^{\pi_\theta}(s_{t+1}) & \text{otherwise} \end{cases}$$
+<p>Rather than bootstrapping with a single sampled next action, the target uses the policy-weighted expectation $\mathbb{E}_{a\sim\pi_\theta}[Q_w(s_{t+1},a)]$, which equals $V^{\pi_\theta}(s_{t+1})$ under the current critic.</p>
+<p><strong>Critic update (L115–119):</strong> $\mathcal{L}(w) = (Q_w(s_t,a_t)-y_t)^2,\quad w \leftarrow w - \alpha_w \nabla_w \mathcal{L}(w)$</p>
+
+<h3>(b) Do you agree with GPT? — <strong>No, two issues.</strong></h3>
+<p><strong>Issue 1 (algorithmic):</strong> Standard QAC uses a SARSA-style target $y_t = r_t + \gamma\, Q_w(s_{t+1}, a_{t+1})$ where $a_{t+1}\!\sim\!\pi_\theta$. GPT uses Expected SARSA instead, which deviates from the standard QAC formulation (though it reduces variance).</p>
+<p><strong>Issue 2 (terminal handling):</strong> Line 112 uses <code>done = terminated or truncated</code> (L94) to stop bootstrapping. When an episode is <strong>truncated</strong> (max steps reached), it is not truly terminal — bootstrapping should still occur. The condition should use only <code>terminated</code>:</p>
+$$y_t = r_t + \gamma\,(1-\mathbb{1}[\mathrm{terminated}])\,\hat{V}^{\pi_\theta}(s_{t+1})$$
+
+</body>
+</html>

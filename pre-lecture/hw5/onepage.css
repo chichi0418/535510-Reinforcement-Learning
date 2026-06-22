@@ -1,0 +1,20 @@
+@page {
+  size: A4;
+  margin: 8mm 10mm;
+}
+html, body {
+  font-size: 7.8pt;
+  line-height: 1.18;
+  font-family: -apple-system, "Helvetica Neue", Arial, "PingFang TC", sans-serif;
+}
+h1 { font-size: 11pt; margin: 0 0 2px; }
+h2 { font-size: 9.5pt; margin: 4px 0 2px; border-bottom: 1px solid #999; padding-bottom: 1px; }
+h3 { font-size: 8.5pt; margin: 3px 0 1px; }
+p  { margin: 2px 0; text-align: justify; }
+table { border-collapse: collapse; width: 100%; margin: 2px 0; font-size: 7.4pt; }
+th, td { border: 1px solid #888; padding: 1px 3px; vertical-align: top; }
+th { background: #eee; }
+ul, ol { margin: 1px 0 1px 16px; padding: 0; }
+li { margin: 0; }
+strong { font-weight: 600; }
+code { font-size: 7.4pt; }
