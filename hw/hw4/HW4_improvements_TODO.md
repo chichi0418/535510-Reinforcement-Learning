@@ -10,6 +10,15 @@
 
 ## 🔴 高影響 — 唯一的 spec 字面缺口
 
+### 1. ✅ 已完成 — 基線跑滿 1 個 epoch(7767 步)
+- **已跑**:`python train_dpo.py --run_name default_fullepoch`,跑滿 1 epoch = **7767 步**(epoch=1.0)。
+- **W&B**:offline run 已 `wandb sync` 上傳 → <https://wandb.ai/jacky920418a-national-yang-ming-chiao-tung-university/dpo/runs/1wc9cbu6>
+- **已更新 `HW4_Problem2.md` (b)**:Epochs 改 7767 步、圖說、Observed 表、accuracy plateau 說明、Final values 表全部換成 full-epoch 數字。
+- **full-epoch final 數字**:train margin 0.838(last-10 0.784)、train acc 0.70(last-10 0.68)、train loss 0.553(epoch-avg 0.580)、**eval margin 0.29→0.71**、eval loss 0.564、eval acc 0.668、peak VRAM 10.38 GB。
+- **⚠️ 待使用者重截 (b) 的 7 張圖**(清單見 `wandb_screenshots/README.md`,皆來自 `default_fullepoch` run;(c) 的 6 張 `2c_compare_*` 不變)。
+
+<details><summary>原始說明(已完成,保留備查)</summary>
+
 ### 1. 基線 Run A 跑滿 1 個 epoch(目前只 1000 步)
 - **為什麼**:spec 的「step 1000 允許」原文只寫在 **Problem 2(c)**;**(b)** 嚴格說要訓練滿 `Epochs = 1`(≈ 7767 步 = 62135 / 有效批次 8)。(c) 用 1000 步是 spec 明文允許,**不用動**。
 - **要改的檔**:跑 `train_dpo.py`(server)→ 重產 `plots/default_curves.png` 與 W&B 截圖 → 更新 `HW4_Problem2.md` 的 (b) 圖與 final 數字。
@@ -23,6 +32,8 @@
   然後到 W&B 重截 (b) 的 4 張必要圖(chosen/rejected/margins/loss),覆蓋 `wandb_screenshots/2b_default_train_*.png`,並把 `HW4_Problem2.md` (b) 的 final 數字改成滿 epoch 的值。
 - **注意**:full epoch 後 margin/accuracy 會比 1000 步更高、更平滑;(b) 的文字趨勢敘述仍成立,只需換數字與圖。
 - **成本**:server 上約數小時(Volta + gradient checkpointing)。**若時間不夠可不做**——目前 1000 步版已用 eval margin 上升證明有學到、且文中已引用 step-1000 允許。
+
+</details>
 
 ---
 

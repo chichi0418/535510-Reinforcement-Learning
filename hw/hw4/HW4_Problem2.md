@@ -5,8 +5,10 @@
 > mirrored to `logs/history_<run>.json`; figures are produced by `python plot_metrics.py` (saved under
 > `plots/`).
 >
-> **All numbers below are from actual runs** of all five configurations (A–E), each to 1000 steps on a
-> 12 GB NVIDIA TITAN V. See the hardware-adaptation note in (b) for the four results-neutral changes
+> **All numbers below are from actual runs** on a 12 GB NVIDIA TITAN V. The baseline in (b) is trained
+> for a **full epoch (7767 optimizer steps)**; the five-way hyperparameter study in (c) caps every run
+> (A–E) at **1000 steps** for an apples-to-apples comparison (the spec's "step 1000" allowance).
+> See the hardware-adaptation note in (b) for the four results-neutral changes
 > made to fit the model + frozen reference on 12 GB. Plots referenced as `plots/*.png` are the offline
 > renders; the native W&B dashboard versions are embedded below as `wandb_screenshots/*.png`.
 >
@@ -66,12 +68,13 @@ one motivation for length-normalized variants such as IPO (see Problem 1, Q4).
 
 ## (b) DPO Training — baseline run
 
-Command: `python train_dpo.py` (defaults reproduce the table below).
+Command: `python train_dpo.py --run_name default_fullepoch` (defaults — no `--max_steps` cap —
+reproduce the full-epoch table below).
 
 | Hyperparameter | Value |
 |---|---|
 | Model | Qwen/Qwen2.5-0.5B-Instruct |
-| Epochs | 1 (capped at **1000 optimizer steps**, per the assignment's "step 1000" allowance) |
+| Epochs | **1 full epoch = 7767 optimizer steps** (62,135 examples ÷ effective batch 8) |
 | Effective batch | **8** |
 | Learning rate | 5e-7 |
 | $\beta$ | 0.1 |
@@ -97,49 +100,51 @@ Command: `python train_dpo.py` (defaults reproduce the table below).
 > mirrored to `logs/history_<run>.json`; the plots below are produced by
 > `python plot_metrics.py`.
 
-**Training curves (baseline `default` run, W&B).** The four metrics the assignment asks to report,
-plotted over training steps (`train/global_step`):
+**Training curves (baseline `default_fullepoch` run, full epoch = 7767 steps, W&B).** The four metrics
+the assignment asks to report, plotted over training steps (`train/global_step`):
 
-![`rewards/chosen` (train) — stays slightly negative and noisy/flat (≈ −0.05 → −0.2)](wandb_screenshots/2b_default_train_rewards-chosen.png){width=66%}
+![`rewards/chosen` (train) — drifts slightly negative (≈ 0 → −0.5)](wandb_screenshots/2b_default_train_rewards-chosen.png){width=66%}
 
-![`rewards/rejected` (train) — falls clearly (≈ −0.1 → −0.7)](wandb_screenshots/2b_default_train_rewards-rejected.png){width=66%}
+![`rewards/rejected` (train) — falls clearly (≈ 0 → −1.37)](wandb_screenshots/2b_default_train_rewards-rejected.png){width=66%}
 
-![`rewards/margins` (train) — rises steadily (0 → ≈ 0.58)](wandb_screenshots/2b_default_train_rewards-margins.png){width=66%}
+![`rewards/margins` (train) — rises steeply then plateaus (0 → ≈ 0.84)](wandb_screenshots/2b_default_train_rewards-margins.png){width=66%}
 
-![`train/loss` — decreases (≈ 0.68 → 0.53)](wandb_screenshots/2b_default_train_loss.png){width=66%}
+![`train/loss` — decreases (≈ 0.68 → ~0.55; epoch-average 0.58)](wandb_screenshots/2b_default_train_loss.png){width=66%}
 
 Supporting metrics (W&B):
 
-![`rewards/accuracies` (train) — rises 0.43 → 0.76](wandb_screenshots/2b_default_train_rewards-accuracies.png){width=66%}
+![`rewards/accuracies` (train) — rises 0.43 → plateaus ≈ 0.70](wandb_screenshots/2b_default_train_rewards-accuracies.png){width=66%}
 
-![`eval/rewards/margins` (held-out 256-example subset) — rises 0.275 → 0.392 over steps 250→1000, confirming the preference signal generalizes rather than memorizing the train batch](wandb_screenshots/2b_default_eval_rewards-margins.png){width=66%}
+![`eval/rewards/margins` (held-out 256-example subset) — rises 0.29 → 0.71 over the full epoch (steepest in the first ~2000 steps, then plateaus), confirming the preference signal generalizes rather than memorizing the train batch](wandb_screenshots/2b_default_eval_rewards-margins.png){width=66%}
 
 ![`logps/chosen` (solid) and `logps/rejected` (dashed), train — raw policy log-probs $\log\pi_\theta(y\mid x)$ (not log-ratios). Chosen sits below rejected mainly because chosen responses are longer (271.9 vs 245.4 tokens), so their summed log-prob is more negative.](wandb_screenshots/2b_default_train_logps.png){width=66%}
 
-**Observed behavior (1000 steps, this run):**
+**Observed behavior (full epoch, 7767 steps, this run):**
 
 | Metric | Spec expected (Remark) | Observed trend | Note |
 |---|---|---|---|
-| `rewards/chosen`   | ↑ increases | stays slightly **negative**, roughly flat (≈ −0.05 → −0.2, noisy) | the policy does *not* raise the chosen likelihood above the reference; it drifts a little below — see the note below, this is well-documented DPO behavior |
-| `rewards/rejected` | ↓ decreases | clearly **falls** (≈ −0.1 → −0.7) ✓ | the policy strongly suppresses rejected responses relative to $\pi_{\text{ref}}$ |
-| `rewards/margins`  | ↑ increases | **rises steadily** (≈ 0 → ~0.5) ✓ | margin = chosen − rejected; it grows almost entirely because *rejected drops faster than chosen* |
-| `rewards/accuracies` | ↑ toward 1.0 | **rises** ≈ 0.43 → ~0.70 ✓ (trend) | fraction of the batch with reward(chosen) > reward(rejected); rises as expected but plateaus near 0.7, not 1.0 — see below |
-| `loss`             | (↓ implied) | **decreases** (≈ 0.69 → ~0.53) ✓ | $-\log\sigma(\beta\,\Delta)$ shrinks as the margin grows |
+| `rewards/chosen`   | ↑ increases | drifts slightly **negative** (≈ 0 → −0.5) | the policy does *not* raise the chosen likelihood above the reference; it drifts a little below — see the note below, this is well-documented DPO behavior |
+| `rewards/rejected` | ↓ decreases | clearly **falls** (≈ 0 → −1.37) ✓ | the policy strongly suppresses rejected responses relative to $\pi_{\text{ref}}$ |
+| `rewards/margins`  | ↑ increases | **rises** then plateaus (≈ 0 → ~0.84) ✓ | margin = chosen − rejected; it grows almost entirely because *rejected drops faster than chosen* |
+| `rewards/accuracies` | ↑ toward 1.0 | **rises** ≈ 0.43 → plateaus ~0.70 ✓ (trend) | fraction of the batch with reward(chosen) > reward(rejected); rises as expected but plateaus near 0.7, not 1.0 — see below |
+| `loss`             | (↓ implied) | **decreases** (≈ 0.69 → ~0.55) ✓ | $-\log\sigma(\beta\,\Delta)$ shrinks as the margin grows |
 
 The **trend directions match the spec's Remark in every case** (rejected ↓, margins ↑, accuracies ↑,
 loss ↓). The one apparent mismatch — `rewards/chosen` not increasing — is the expected DPO behavior
 explained in the note below: the objective only needs the chosen-vs-rejected *gap* to widen.
 
 > **Why does `rewards/accuracies` plateau near ~0.7 rather than approaching 1.0?** The spec lists
-> "↑ toward 1.0" as the *direction*, and our accuracy does rise monotonically; it levels off around 0.7
-> for three concrete reasons: (i) **model capacity** — Qwen2.5-**0.5B** is a small policy, so it cannot
-> perfectly separate every preference pair; (ii) **training budget** — we stop at **1000 steps** (well
-> short of the full epoch ≈ 7767 steps at effective batch 8), so the policy is still mid-training; and
-> (iii) **label noise / hard pairs** — UltraFeedback preferences come from imperfect ratings and many
-> chosen/rejected pairs are genuinely close in quality (here `score_chosen`=6 vs `score_rejected`=4 is a
-> clear gap, but many pairs are closer), so the Bayes-optimal accuracy is itself well below 1.0. A
-> larger model and a full epoch would push it higher, but the **direction** is exactly as the spec
-> predicts.
+> "↑ toward 1.0" as the *direction*, and our accuracy does rise; it levels off around 0.7 for two
+> structural reasons: (i) **model capacity** — Qwen2.5-**0.5B** is a small policy, so it cannot
+> perfectly separate every preference pair; and (ii) **label noise / hard pairs** — UltraFeedback
+> preferences come from imperfect ratings and many chosen/rejected pairs are genuinely close in quality
+> (here `score_chosen`=6 vs `score_rejected`=4 is a clear gap, but many pairs are closer), so the
+> Bayes-optimal accuracy is itself well below 1.0. Note this run trains a **full epoch (7767 steps)**, so
+> "insufficient training budget" is *not* the explanation: train accuracy reaches ≈ 0.77 around step
+> 1000 and then oscillates in the 0.67–0.70 band for the rest of the epoch, and held-out
+> `eval_rewards/accuracies` plateaus at ≈ 0.67 — i.e. the ceiling is set by capacity + label noise, not
+> by how long we train. A larger model would push it higher, but the **direction** is exactly as the
+> spec predicts.
 
 > **Note on `rewards/chosen`.** The idealized DPO picture is "chosen up, rejected down."
 > In practice at this small learning rate, *both* implicit rewards go **negative**
@@ -150,21 +155,23 @@ explained in the note below: the objective only needs the chosen-vs-rejected *ga
 > only requires the *gap* to widen, not the chosen reward to be positive. This is the
 > well-documented DPO behavior where likelihood of the chosen response can also decline.
 
-**Final baseline values** (β = 0.1, lr = 5e-7, step 1000):
+**Final baseline values** (β = 0.1, lr = 5e-7, full epoch = 7767 steps):
 
 | Quantity | Value |
 |---|---|
-| `rewards/margins` (final step 1000) | **0.582** |
-| `rewards/margins` (mean of last 10 logs, ≈ steps 775–1000) | **0.437** |
-| `rewards/accuracies` (final / last-10 mean) | **0.76 / 0.67** |
-| `loss` (final / last-10 mean) | **0.532 / 0.594** |
-| eval (256-ex subset): `eval_rewards/margins`, `eval_loss`, `eval_acc` | **0.392 / 0.606 / 0.656** |
+| `rewards/margins` (final / last-10-log mean) | **0.838 / 0.784** |
+| `rewards/accuracies` (final / last-10 mean) | **0.70 / 0.68** |
+| `loss` (final-step / epoch-average `train_loss`) | **0.553 / 0.580** |
+| eval (256-ex subset, end of epoch): `eval_rewards/margins`, `eval_loss`, `eval_acc` | **0.714 / 0.564 / 0.668** |
 | Peak VRAM | **10.38 GB** |
 
-(The single-step-1000 value is noisy with effective batch 8; the last-10-log mean is a
-more stable estimate of the end-of-training margin. Held-out eval margins also rise —
-0.275 → 0.329 → 0.369 → 0.392 at steps 500/750/1000 — confirming the preference signal
-generalizes, not just memorizes the train batch.)
+(The single-step value is noisy with effective batch 8; the last-10-log mean is a more
+stable estimate of the end-of-training margin. The held-out eval margin rises **monotonically
+from 0.29 to 0.71** over the epoch — steepest in the first ~2000 steps, then plateauing —
+confirming the preference signal generalizes rather than memorizing the train batch. For
+reference, at the step-1000 mark this same run already had train margin ≈ 0.78 / eval margin
+≈ 0.55; the remaining ~6700 steps mostly sharpen and stabilize the margin while accuracy holds
+near its ~0.68 ceiling.)
 
 ---
 
