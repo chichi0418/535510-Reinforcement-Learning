@@ -44,19 +44,19 @@ Select **all five runs** (A–E) so lines overlay in one panel:
 Each backs a *specific sentence* already in `HW4_Problem2.md`. TRAIN/EVAL marked explicitly.
 
 HIGH value:
-- [ ] `2b_default_eval_rewards-margins.png` — **EVAL** `eval/rewards/margins` (default run only):
+- [x] `2b_default_eval_rewards-margins.png` — **EVAL** `eval/rewards/margins` (default run only):
       backs the 2(b) claim that the *held-out* margin rises 0.275→0.392 (generalizes, not memorizes).
       ⚠️ This is the ONLY eval screenshot worth taking — make sure it is the `eval/` panel, not train.
-- [ ] `2c_compare_train_rewards-rejected.png` — **TRAIN** `rewards/rejected`, all 5 runs overlaid:
+- [x] `2c_compare_train_rewards-rejected.png` — **TRAIN** `rewards/rejected`, all 5 runs overlaid:
       backs 2(c) takeaway #3 ("rejected falls in every healthy run"; margin grows mainly via rejected).
-- [ ] `2c_compare_train_grad-norm.png` — **TRAIN** `grad_norm`, all 5 runs overlaid:
+- [x] `2c_compare_train_grad-norm.png` — **TRAIN** `grad_norm`, all 5 runs overlaid:
       backs the 2(c) claim that the high-LR run D is the noisiest / least stable.
 
 MEDIUM value (all TRAIN):
-- [ ] `2c_compare_train_rewards-chosen.png` — TRAIN `rewards/chosen`, all 5 runs overlaid.
-- [ ] `2b_default_train_logps.png` — TRAIN `logps/chosen` and `logps/rejected` together (default run):
+- [x] `2c_compare_train_rewards-chosen.png` — TRAIN `rewards/chosen`, all 5 runs overlaid.
+- [x] `2b_default_train_logps.png` — TRAIN `logps/chosen` and `logps/rejected` together (default run):
       raw evidence that both log-ratios go negative, rejected more so.
-- [ ] `2c_compare_train_loss.png` — TRAIN `train/loss`, all 5 runs overlaid.
+- [x] `2c_compare_train_loss.png` — TRAIN `train/loss`, all 5 runs overlaid.
 
 SKIP (no grading value): entropy, mean_token_accuracy, learning_rate, eval/loss, logits/*,
 and any *_runtime / total_flos metrics.
