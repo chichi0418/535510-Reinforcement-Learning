@@ -1,0 +1,6 @@
+imports OK
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+splits: ['train', 'test']
+train size: 62135
+keys: ['chosen', 'rejected', 'score_chosen', 'score_rejected']
+chosen first turn: {'content': 'Use the pygame library to write a version of the classic game Snake, with a unique twist', 'role': 'user'}

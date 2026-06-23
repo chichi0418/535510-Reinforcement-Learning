@@ -1,0 +1,8 @@
+Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+ALL KEYS: ['chosen', 'rejected', 'score_chosen', 'score_rejected']
+num turns chosen: 2 | roles: ['user', 'assistant']
+num turns rejected: 2 | roles: ['user', 'assistant']
+score_chosen: 6.0 score_rejected: 4.0
+user turn == across chosen/rejected: True
+Avg chosen   token length: 271.9
+Avg rejected token length: 245.4

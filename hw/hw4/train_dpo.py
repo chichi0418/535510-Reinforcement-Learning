@@ -35,11 +35,13 @@ parser = argparse.ArgumentParser(description="DPO on UltraFeedback (HW4)")
 parser.add_argument("--beta",          type=float, default=0.1,    help="KL penalty strength (default 0.1)")
 parser.add_argument("--learning_rate", type=float, default=5e-7,   help="learning rate (default 5e-7)")
 parser.add_argument("--run_name",      type=str,   default="default", help="W&B run name / output sub-dir")
+parser.add_argument("--max_steps",     type=int,   default=-1,     help="cap training at N optimizer steps (-1 = full epoch)")
 args_cli = parser.parse_args()
 
 BETA          = args_cli.beta
 LEARNING_RATE = args_cli.learning_rate
 RUN_NAME      = args_cli.run_name
+MAX_STEPS     = args_cli.max_steps
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -48,7 +50,11 @@ RUN_NAME      = args_cli.run_name
 
 dataset       = load_dataset("trl-lib/ultrafeedback_binarized")
 train_dataset = dataset["train"]
-eval_dataset  = dataset["test"]
+# Evaluate on a small held-out subset: the deliverable curves come from the
+# per-step TRAIN logs; periodic eval over the full 1k-example test split costs
+# ~2 min each on a 12 GB GPU, so a 256-example subset keeps eval cheap while
+# still showing the held-out reward margin grows.
+eval_dataset  = dataset["test"].select(range(256))
 
 # TODO — Print and inspect
 # ########## Your Code (2-3 lines)##########
@@ -112,8 +118,24 @@ wandb.init(
 
 MODEL_NAME = "Qwen/Qwen2.5-0.5B-Instruct"
 
+# Mixed-precision selection: bf16 needs Ampere+ (compute capability >= 8.0).
+# On older GPUs (e.g. Volta/TITAN V, CC 7.0) bf16 has no tensor-core support,
+# so we fall back to fp16, which Volta does accelerate.
+_cc_major = torch.cuda.get_device_capability(0)[0] if torch.cuda.is_available() else 0
+USE_BF16  = _cc_major >= 8
+USE_FP16  = torch.cuda.is_available() and not USE_BF16
+print(f"GPU compute capability major={_cc_major} -> bf16={USE_BF16}, fp16={USE_FP16}")
+
+# Load the policy in a dtype consistent with the mixed-precision mode:
+#  - bf16 path (Ampere+): load in the checkpoint's native dtype (bf16); bf16
+#    training needs no grad-scaler.
+#  - fp16 path (Volta):  load in fp32 so the fp16 AMP grad-scaler has fp32
+#    master weights to unscale (it has no kernel for bf16 grads). Autocast still
+#    runs the forward in fp16 on the GPU's tensor cores.
+_model_dtype = "auto" if USE_BF16 else torch.float32
+
 # Load model and tokenizer
-model     = AutoModelForCausalLM.from_pretrained(MODEL_NAME, torch_dtype="auto")
+model     = AutoModelForCausalLM.from_pretrained(MODEL_NAME, torch_dtype=_model_dtype)
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 
 if tokenizer.pad_token is None:
@@ -128,16 +150,38 @@ if tokenizer.pad_token is None:
 training_args = DPOConfig(
     output_dir                  = f"dpo-{RUN_NAME}",
     num_train_epochs            = 1,
-    per_device_train_batch_size = 2,
-    gradient_accumulation_steps = 4,    # effective batch = 8
+    max_steps                   = MAX_STEPS,   # -1 = run the full epoch
+    # Effective batch = per_device * grad_accum = 8 (the value in the HW table).
+    # On a 12 GB GPU we use per_device=1 / accum=8 instead of 2/4: the huge
+    # 152k-vocab logits tensor (chosen+rejected concatenated) is what drives peak
+    # memory, so halving the per-device micro-batch keeps us under the cap while
+    # leaving the effective batch — and thus the optimization — unchanged.
+    per_device_train_batch_size = 1,
+    per_device_eval_batch_size  = 1,    # keep eval within the 12 GB budget too
+    gradient_accumulation_steps = 8,    # effective batch = 8
     learning_rate               = LEARNING_RATE,
     beta                        = BETA,
     max_length                  = 1024,
     logging_steps               = 25,
     eval_strategy               = "steps",
-    eval_steps                  = 100,
+    eval_steps                  = 250,
     save_strategy               = "epoch",
-    bf16                        = True,
+    bf16                        = USE_BF16,
+    fp16                        = USE_FP16,
+    # Gradient checkpointing trades compute for memory (activations are recomputed
+    # in the backward pass) so the batch=2, max_length=1024 setup + a frozen
+    # reference copy fits on a 12 GB GPU. It does NOT change the optimization math
+    # or the logged metrics.
+    gradient_checkpointing      = True,
+    gradient_checkpointing_kwargs = {"use_reentrant": False},
+    # Optimizer: AdamW keeps two fp32 moment buffers per parameter (~4 GB for a
+    # 0.5B model in fp32). On the 12 GB GPU that, on top of the fp32 policy + a
+    # frozen fp32 reference + the 152k-vocab logits, overflows VRAM. Adafactor
+    # keeps a factored (near-zero) second-moment state, freeing ~4 GB, so we use
+    # it on the fp16/limited-VRAM path and the default AdamW on bf16/large GPUs.
+    # None of the assignment's listed hyperparameters (lr, beta, effective batch,
+    # max_length) are affected.
+    optim                       = "adafactor" if USE_FP16 else "adamw_torch",
     report_to                   = "wandb",  # hands all trainer metrics to W&B
     run_name                    = RUN_NAME,
 )
@@ -169,6 +213,13 @@ trainer.train()
 peak_vram_gb = torch.cuda.max_memory_allocated() / 1e9
 print(f"Peak VRAM used: {peak_vram_gb:.2f} GB")
 wandb.summary["peak_vram_gb"] = peak_vram_gb
+
+# Dump the full metric history to JSON so the training curves can be re-plotted
+# offline (independent of the W&B dashboard).
+import json
+with open(f"logs/history_{RUN_NAME}.json", "w") as f:
+    json.dump(trainer.state.log_history, f, indent=2)
+print(f"Metric history written to logs/history_{RUN_NAME}.json")
 
 # Save checkpoints
 final_dir = f"dpo-{RUN_NAME}-final"

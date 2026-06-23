@@ -1,0 +1,7 @@
+# DPO checkpoints / final models (large; ~1.9 GB each, regenerable via train_dpo.py)
+dpo-*/
+
+# Python venv
+.venv/
+__pycache__/
+*.pyc
