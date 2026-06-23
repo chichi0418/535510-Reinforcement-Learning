@@ -83,9 +83,8 @@ Two stages cooperate:
    completion and builds a **completion mask** that is `1` only on response tokens (and `0` on prompt
    and padding tokens).
 
-2. **Forward + reduction — `compute_loss()` → `concatenated_forward()`** (`dpo_trainer.py` ≈ Line 1190).
-   Chosen and rejected are
-   stacked into one batch and run through the model. Per-token log-probabilities of the *realized*
+2. **Forward + reduction — `compute_loss()` / `_compute_loss()`** (`dpo_trainer.py` ≈ Line 1190).
+   Chosen and rejected are stacked into one batch and run through the model. Per-token log-probabilities of the *realized*
    next token are gathered, the prompt/padding positions are zeroed using the completion mask, and
    the remainder is **summed over the sequence dimension**:
    ```python
@@ -113,10 +112,13 @@ The **default is `truncation_mode="keep_start"`** (confirmed in `dpo_config.py`:
 `truncation_mode: str = field(default="keep_start", ...)`). With `keep_start`, the slice
 `[:max_length]` keeps the **beginning** of the sequence and discards the tail.
 
-Since the prompt sits at the beginning of the concatenated sequence, **the beginning survives, so the
-prompt is preserved and it is the response (the end) that gets cut.** (Choosing `keep_end` would
-invert this — keep the end, dropping the front of the prompt.) The default `keep_start` therefore
-guarantees the prompt always stays intact; only overly long responses lose their tail tokens.
+Since the prompt sits at the beginning of the concatenated sequence, **the prefix survives, so
+response tokens at the end are cut first.** If the prompt itself is shorter than `max_length` (the
+usual case), the whole prompt is preserved and only the response tail is truncated. If the prompt
+alone already exceeds `max_length`, then even `keep_start` can only keep the first `max_length`
+prompt tokens and the response may disappear entirely. Choosing `keep_end` inverts the preference:
+it keeps the end of the prompt+response pair, so it may drop the front of the prompt while preserving
+later response tokens.
 
 ### Question 3 — Numerical stability of $\log\sigma(\cdot)$
 

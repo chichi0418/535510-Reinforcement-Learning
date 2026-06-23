@@ -8,7 +8,7 @@
 > **All numbers below are from actual runs** on a 12 GB NVIDIA TITAN V. The baseline in (b) is trained
 > for a **full epoch (7767 optimizer steps)**; the five-way hyperparameter study in (c) caps every run
 > (A–E) at **1000 steps** for an apples-to-apples comparison (the spec's "step 1000" allowance).
-> See the hardware-adaptation note in (b) for the four results-neutral changes
+> See the hardware-adaptation note in (b) for the four hardware-driven changes
 > made to fit the model + frozen reference on 12 GB. Plots referenced as `plots/*.png` are the offline
 > renders; the native W&B dashboard versions are embedded below as `wandb_screenshots/*.png`.
 >
@@ -83,8 +83,11 @@ reproduce the full-epoch table below).
 > **Hardware-adaptation note (12 GB NVIDIA TITAN V, Volta CC 7.0).** The reference
 > setup assumes a ≥20 GB GPU. To fit Qwen2.5-0.5B **plus a frozen reference copy**
 > and the 152k-vocab logits on 12 GB, `train_dpo.py` auto-detects the GPU and makes
-> four **results-neutral** adjustments — none of which change the assignment's listed
-> hyperparameters ($\beta$, learning rate, effective batch = 8, `max_length` = 1024):
+> four **hardware-driven** adjustments — none of which change the assignment's listed
+> hyperparameters ($\beta$, learning rate, effective batch = 8, `max_length` = 1024).
+> Items 2–3 are *exact* (identical optimization math); items 1 and 4 (precision and
+> optimizer) can shift the *absolute* numbers slightly, but are applied **uniformly
+> across all runs**, so every comparison in (b)/(c) stays internally consistent:
 > 1. **fp16 mixed precision instead of bf16** — Volta has no bf16 tensor cores; the
 >    policy is loaded in fp32 so the fp16 AMP grad-scaler has fp32 master weights
 >    (this keeps the tiny lr = 5e-7 updates from underflowing).
@@ -166,8 +169,9 @@ explained in the note below: the objective only needs the chosen-vs-rejected *ga
 | Peak VRAM | **10.38 GB** |
 
 (The single-step value is noisy with effective batch 8; the last-10-log mean is a more
-stable estimate of the end-of-training margin. The held-out eval margin rises **monotonically
-from 0.29 to 0.71** over the epoch — steepest in the first ~2000 steps, then plateauing —
+stable estimate of the end-of-training margin. The held-out eval margin rises **overall
+from 0.29 to a ~0.73 peak, settling ≈ 0.71** over the epoch (with minor step-to-step
+fluctuations) — steepest in the first ~2000 steps, then plateauing —
 confirming the preference signal generalizes rather than memorizing the train batch. For
 reference, at the step-1000 mark this same run already had train margin ≈ 0.78 / eval margin
 ≈ 0.55; the remaining ~6700 steps mostly sharpen and stabilize the margin while accuracy holds

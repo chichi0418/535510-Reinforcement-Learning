@@ -113,9 +113,8 @@ Two stages cooperate:
    completion and builds a **completion mask** that is `1` only on response tokens (and `0` on prompt
    and padding tokens).
 
-2. **Forward + reduction — `compute_loss()` → `concatenated_forward()`** (`dpo_trainer.py` ≈ Line 1190).
-   Chosen and rejected are
-   stacked into one batch and run through the model. Per-token log-probabilities of the *realized*
+2. **Forward + reduction — `compute_loss()` / `_compute_loss()`** (`dpo_trainer.py` ≈ Line 1190).
+   Chosen and rejected are stacked into one batch and run through the model. Per-token log-probabilities of the *realized*
    next token are gathered, the prompt/padding positions are zeroed using the completion mask, and
    the remainder is **summed over the sequence dimension**:
    ```python
@@ -143,10 +142,13 @@ The **default is `truncation_mode="keep_start"`** (confirmed in `dpo_config.py`:
 `truncation_mode: str = field(default="keep_start", ...)`). With `keep_start`, the slice
 `[:max_length]` keeps the **beginning** of the sequence and discards the tail.
 
-Since the prompt sits at the beginning of the concatenated sequence, **the beginning survives, so the
-prompt is preserved and it is the response (the end) that gets cut.** (Choosing `keep_end` would
-invert this — keep the end, dropping the front of the prompt.) The default `keep_start` therefore
-guarantees the prompt always stays intact; only overly long responses lose their tail tokens.
+Since the prompt sits at the beginning of the concatenated sequence, **the prefix survives, so
+response tokens at the end are cut first.** If the prompt itself is shorter than `max_length` (the
+usual case), the whole prompt is preserved and only the response tail is truncated. If the prompt
+alone already exceeds `max_length`, then even `keep_start` can only keep the first `max_length`
+prompt tokens and the response may disappear entirely. Choosing `keep_end` inverts the preference:
+it keeps the end of the prompt+response pair, so it may drop the front of the prompt while preserving
+later response tokens.
 
 ### Question 3 — Numerical stability of $\log\sigma(\cdot)$
 
@@ -228,7 +230,7 @@ In all cases the gradient flows only through $\pi_\theta$; $\pi_{\text{ref}}$ co
 > **All numbers below are from actual runs** on a 12 GB NVIDIA TITAN V. The baseline in (b) is trained
 > for a **full epoch (7767 optimizer steps)**; the five-way hyperparameter study in (c) caps every run
 > (A–E) at **1000 steps** for an apples-to-apples comparison (the spec's "step 1000" allowance).
-> See the hardware-adaptation note in (b) for the four results-neutral changes
+> See the hardware-adaptation note in (b) for the four hardware-driven changes
 > made to fit the model + frozen reference on 12 GB. Plots referenced as `plots/*.png` are the offline
 > renders; the native W&B dashboard versions are embedded below as `wandb_screenshots/*.png`.
 >
@@ -303,8 +305,11 @@ reproduce the full-epoch table below).
 > **Hardware-adaptation note (12 GB NVIDIA TITAN V, Volta CC 7.0).** The reference
 > setup assumes a ≥20 GB GPU. To fit Qwen2.5-0.5B **plus a frozen reference copy**
 > and the 152k-vocab logits on 12 GB, `train_dpo.py` auto-detects the GPU and makes
-> four **results-neutral** adjustments — none of which change the assignment's listed
-> hyperparameters ($\beta$, learning rate, effective batch = 8, `max_length` = 1024):
+> four **hardware-driven** adjustments — none of which change the assignment's listed
+> hyperparameters ($\beta$, learning rate, effective batch = 8, `max_length` = 1024).
+> Items 2–3 are *exact* (identical optimization math); items 1 and 4 (precision and
+> optimizer) can shift the *absolute* numbers slightly, but are applied **uniformly
+> across all runs**, so every comparison in (b)/(c) stays internally consistent:
 > 1. **fp16 mixed precision instead of bf16** — Volta has no bf16 tensor cores; the
 >    policy is loaded in fp32 so the fp16 AMP grad-scaler has fp32 master weights
 >    (this keeps the tiny lr = 5e-7 updates from underflowing).
@@ -386,8 +391,9 @@ explained in the note below: the objective only needs the chosen-vs-rejected *ga
 | Peak VRAM | **10.38 GB** |
 
 (The single-step value is noisy with effective batch 8; the last-10-log mean is a more
-stable estimate of the end-of-training margin. The held-out eval margin rises **monotonically
-from 0.29 to 0.71** over the epoch — steepest in the first ~2000 steps, then plateauing —
+stable estimate of the end-of-training margin. The held-out eval margin rises **overall
+from 0.29 to a ~0.73 peak, settling ≈ 0.71** over the epoch (with minor step-to-step
+fluctuations) — steepest in the first ~2000 steps, then plateauing —
 confirming the preference signal generalizes rather than memorizing the train batch. For
 reference, at the step-1000 mark this same run already had train margin ≈ 0.78 / eval margin
 ≈ 0.55; the remaining ~6700 steps mostly sharpen and stabilize the margin while accuracy holds

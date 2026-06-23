@@ -1,15 +1,19 @@
 #!/usr/bin/env bash
 # ──────────────────────────────────────────────────────────────────────────────
-# HW4 (DPO) — set up a virtual environment and run all five experiments (A–E).
+# HW4 (DPO) — set up a virtual environment and run the five 1000-step
+# hyperparameter ablations (A–E) for Problem 2(c).
 #
 # Run this on a machine with a CUDA GPU (the script trains Qwen2.5-0.5B with a
 # frozen reference copy; bf16 + CUDA are required by train_dpo.py).
 #
 # Usage:
-#   bash run_all.sh                 # create venv, install deps, run A–E
+#   bash run_all.sh                 # create venv, install deps, run A–E for 1000 steps each
 #   SKIP_INSTALL=1 bash run_all.sh  # reuse existing venv, skip pip install
 #   PYTHON=python3.10 bash run_all.sh
 #   bash run_all.sh A C             # run only specific experiments (e.g. A and C)
+#
+# Full-epoch baseline for Problem 2(b):
+#   python train_dpo.py --run_name default_fullepoch
 # ──────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -58,11 +62,11 @@ PY
 # ── 5. Define the five experiments ────────────────────────────────────────────
 # Each entry: "<extra args> --run_name <name>"
 declare -A RUNS=(
-    [A]="--run_name default"                       # baseline: beta=0.1, lr=5e-7
-    [B]="--beta 0.01 --run_name beta0.01"          # weak KL penalty
-    [C]="--beta 0.5  --run_name beta0.5"           # strong KL penalty
-    [D]="--learning_rate 5e-6 --run_name lr5e-6"   # 10x higher LR
-    [E]="--learning_rate 5e-8 --run_name lr5e-8"   # 10x lower LR
+    [A]="--max_steps 1000 --run_name default"                       # baseline: beta=0.1, lr=5e-7
+    [B]="--max_steps 1000 --beta 0.01 --run_name beta0.01"          # weak KL penalty
+    [C]="--max_steps 1000 --beta 0.5  --run_name beta0.5"           # strong KL penalty
+    [D]="--max_steps 1000 --learning_rate 5e-6 --run_name lr5e-6"   # 10x higher LR
+    [E]="--max_steps 1000 --learning_rate 5e-8 --run_name lr5e-8"   # 10x lower LR
 )
 ORDER=(A B C D E)
 

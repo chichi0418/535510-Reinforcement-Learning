@@ -3,13 +3,17 @@
 # Instructor: Ping-Chun Hsieh (National Yang Ming Chiao Tung University)
 #
 # ──────────────────────────────────────────────────────────────────────────────
-# How to run the Problem 2 experiments (one factor varied at a time):
+# How to run the Problem 2 experiments:
 #
-#   Run A (baseline) : python train_dpo.py
-#   Run B (beta=0.01): python train_dpo.py --beta 0.01          --run_name beta0.01
-#   Run C (beta=0.5) : python train_dpo.py --beta 0.5           --run_name beta0.5
-#   Run D (lr=5e-6)  : python train_dpo.py --learning_rate 5e-6 --run_name lr5e-6
-#   Run E (lr=5e-8)  : python train_dpo.py --learning_rate 5e-8 --run_name lr5e-8
+#   Problem 2(b), full-epoch baseline:
+#     python train_dpo.py --run_name default_fullepoch
+#
+#   Problem 2(c), 1000-step ablations (one factor varied at a time):
+#     Run A (baseline) : python train_dpo.py --max_steps 1000 --run_name default
+#     Run B (beta=0.01): python train_dpo.py --max_steps 1000 --beta 0.01          --run_name beta0.01
+#     Run C (beta=0.5) : python train_dpo.py --max_steps 1000 --beta 0.5           --run_name beta0.5
+#     Run D (lr=5e-6)  : python train_dpo.py --max_steps 1000 --learning_rate 5e-6 --run_name lr5e-6
+#     Run E (lr=5e-8)  : python train_dpo.py --max_steps 1000 --learning_rate 5e-8 --run_name lr5e-8
 #
 # Each run logs rewards/chosen, rewards/rejected, rewards/margins, rewards/accuracies
 # and loss to its own W&B run, and writes its checkpoint to dpo-<run_name>/.
@@ -101,10 +105,13 @@ wandb.init(
         "model":                       "Qwen/Qwen2.5-0.5B-Instruct",
         "beta":                        BETA,
         "learning_rate":               LEARNING_RATE,
-        "per_device_train_batch_size": 2,
-        "gradient_accumulation_steps": 4,
         "num_train_epochs":            1,
         "max_length":                  1024,
+        # NOTE: per-device batch / grad-accum / optimizer / dtype are *not* logged
+        # here because they depend on the GPU auto-detection below (LOW_VRAM). They
+        # are logged with their real values via wandb.config.update() right after
+        # detection, so the dashboard reflects what actually ran (effective batch
+        # is always 8, matching the HW table; see the write-up's hardware note).
         # data stats logged for reference
         "avg_chosen_token_length":     round(avg_chosen,   1),
         "avg_rejected_token_length":   round(avg_rejected, 1),
@@ -122,9 +129,14 @@ MODEL_NAME = "Qwen/Qwen2.5-0.5B-Instruct"
 # On older GPUs (e.g. Volta/TITAN V, CC 7.0) bf16 has no tensor-core support,
 # so we fall back to fp16, which Volta does accelerate.
 _cc_major = torch.cuda.get_device_capability(0)[0] if torch.cuda.is_available() else 0
+_gpu_mem_gb = torch.cuda.get_device_properties(0).total_memory / 1e9 if torch.cuda.is_available() else 0.0
 USE_BF16  = _cc_major >= 8
 USE_FP16  = torch.cuda.is_available() and not USE_BF16
-print(f"GPU compute capability major={_cc_major} -> bf16={USE_BF16}, fp16={USE_FP16}")
+LOW_VRAM  = torch.cuda.is_available() and _gpu_mem_gb < 20.0
+print(
+    f"GPU compute capability major={_cc_major}, memory={_gpu_mem_gb:.1f} GB "
+    f"-> bf16={USE_BF16}, fp16={USE_FP16}, low_vram={LOW_VRAM}"
+)
 
 # Load the policy in a dtype consistent with the mixed-precision mode:
 #  - bf16 path (Ampere+): load in the checkpoint's native dtype (bf16); bf16
@@ -146,19 +158,40 @@ if tokenizer.pad_token is None:
 # Training Configuration
 # ══════════════════════════════════════════════════════════════════════════════
 
+PER_DEVICE_TRAIN_BATCH_SIZE = 1 if LOW_VRAM else 2
+PER_DEVICE_EVAL_BATCH_SIZE  = 1 if LOW_VRAM else 2
+GRADIENT_ACCUMULATION_STEPS = 8 if LOW_VRAM else 4
+OPTIMIZER                   = "adafactor" if LOW_VRAM else "adamw_torch"
+
+# Log the *actual* (post-detection) training config so the W&B dashboard matches
+# the DPOConfig that really runs, instead of the HW table's nominal 2 x 4.
+wandb.config.update(
+    {
+        "per_device_train_batch_size": PER_DEVICE_TRAIN_BATCH_SIZE,
+        "per_device_eval_batch_size":  PER_DEVICE_EVAL_BATCH_SIZE,
+        "gradient_accumulation_steps": GRADIENT_ACCUMULATION_STEPS,
+        "effective_batch_size":        PER_DEVICE_TRAIN_BATCH_SIZE * GRADIENT_ACCUMULATION_STEPS,
+        "low_vram_adjustment":         LOW_VRAM,
+        "optimizer":                   OPTIMIZER,
+        "bf16":                        USE_BF16,
+        "fp16":                        USE_FP16,
+        "max_steps":                   MAX_STEPS,
+    },
+    allow_val_change=True,
+)
+
 # Fill in baseline hyperparameters
 training_args = DPOConfig(
     output_dir                  = f"dpo-{RUN_NAME}",
     num_train_epochs            = 1,
     max_steps                   = MAX_STEPS,   # -1 = run the full epoch
     # Effective batch = per_device * grad_accum = 8 (the value in the HW table).
-    # On a 12 GB GPU we use per_device=1 / accum=8 instead of 2/4: the huge
-    # 152k-vocab logits tensor (chosen+rejected concatenated) is what drives peak
-    # memory, so halving the per-device micro-batch keeps us under the cap while
-    # leaving the effective batch — and thus the optimization — unchanged.
-    per_device_train_batch_size = 1,
-    per_device_eval_batch_size  = 1,    # keep eval within the 12 GB budget too
-    gradient_accumulation_steps = 8,    # effective batch = 8
+    # On GPUs with less than 20 GB VRAM we use per_device=1 / accum=8 instead of
+    # the assignment's literal 2/4. This keeps the effective batch unchanged while
+    # halving the large chosen+rejected logits tensor.
+    per_device_train_batch_size = PER_DEVICE_TRAIN_BATCH_SIZE,
+    per_device_eval_batch_size  = PER_DEVICE_EVAL_BATCH_SIZE,
+    gradient_accumulation_steps = GRADIENT_ACCUMULATION_STEPS,
     learning_rate               = LEARNING_RATE,
     beta                        = BETA,
     max_length                  = 1024,
@@ -181,7 +214,7 @@ training_args = DPOConfig(
     # it on the fp16/limited-VRAM path and the default AdamW on bf16/large GPUs.
     # None of the assignment's listed hyperparameters (lr, beta, effective batch,
     # max_length) are affected.
-    optim                       = "adafactor" if USE_FP16 else "adamw_torch",
+    optim                       = OPTIMIZER,
     report_to                   = "wandb",  # hands all trainer metrics to W&B
     run_name                    = RUN_NAME,
 )
