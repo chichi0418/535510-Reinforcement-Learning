@@ -17,20 +17,7 @@
 
 `print(train_dataset[0])` on the current `trl-lib/ultrafeedback_binarized` (train split = **62,135**
 examples) shows each example is a dict with **four keys**, stored in the *implicit-prompt
-conversational* format. Abbreviated console output of `print(train_dataset[0])`:
-
-```text
-keys: ['chosen', 'rejected', 'score_chosen', 'score_rejected']
-chosen:   [{'role': 'user',      'content': 'Use the pygame library to write a version of the
-                                             classic game Snake, with a unique twist'},
-           {'role': 'assistant', 'content': 'Sure, I'd be happy to help you write a version of
-                                             the classic game Snake using pygame! ...'}]
-rejected: [{'role': 'user',      'content': 'Use the pygame library to write a version of the
-                                             classic game Snake, with a unique twist'},   # same user turn
-           {'role': 'assistant', 'content': 'Sure, here is an example of how to write ...'}]
-score_chosen: 6.0   score_rejected: 4.0
-# verified: chosen[0] == rejected[0]  ->  True   (the prompt/user turn is shared)
-```
+conversational* format:
 
 | Key | Type | Meaning |
 |---|---|---|
@@ -63,9 +50,6 @@ one motivation for length-normalized variants such as IPO (see Problem 1, Q4).
 ---
 
 ## (b) DPO Training — baseline run
-
-**W&B dashboard (all five runs A–E):** <!-- TODO: paste your public W&B project URL here, e.g. https://wandb.ai/<entity>/dpo -->
-`https://wandb.ai/<your-entity>/dpo`  *(set the project to "public" so the link is viewable).*
 
 Command: `python train_dpo.py` (defaults reproduce the table below).
 
@@ -151,30 +135,6 @@ Supporting metrics (W&B):
 more stable estimate of the end-of-training margin. Held-out eval margins also rise —
 0.275 → 0.329 → 0.369 → 0.392 at steps 500/750/1000 — confirming the preference signal
 generalizes, not just memorizes the train batch.)
-
-**Alignment with the expected trends (spec Remark table).** Every metric moves in the direction the
-assignment predicts:
-
-| Metric | Expected (spec) | Observed (baseline) | Match? |
-|---|---|---|---|
-| `rewards/chosen`   | ↑ increases     | drifts slightly ↓ (≈ −0.05 → −0.2) | partial* |
-| `rewards/rejected` | ↓ decreases     | ↓ falls (≈ −0.1 → −0.7)            | ✓ |
-| `rewards/margins`  | ↑ increases     | ↑ rises (0 → ≈ 0.58)               | ✓ |
-| `rewards/accuracies` | ↑ toward 1.0  | ↑ 0.43 → 0.76                      | ✓ (direction) |
-
-\*`rewards/chosen` is the one apparent mismatch: the idealized "chosen ↑" assumes the chosen
-likelihood rises *above* the reference, but at this small lr both implicit rewards go mildly negative
-(the policy drifts from $\pi_{\text{ref}}$ on both responses, far more on the rejected one). The DPO
-objective only requires the **margin** to grow (see the note above and Problem 1(a)), so this is the
-expected, well-documented behavior rather than a failure.
-
-**Why `rewards/accuracies` plateaus around 0.7 rather than reaching 1.0.** The spec lists the expected
-trend as "↑ toward 1.0," but our curve saturates near 0.70–0.76. Three reasons: (i) the model is tiny
-(0.5B) and we train only **1000 steps** (~13% of one epoch), so it is nowhere near convergence;
-(ii) `rewards/accuracies` is measured on the *training batch* of UltraFeedback, whose preference labels
-are themselves noisy/near-ties (many chosen/rejected pairs are genuinely close in quality), so 100% is
-not attainable even in principle; (iii) the small lr = 5e-7 keeps the policy close to $\pi_{\text{ref}}$
-by design. The upward direction — the thing the metric is meant to show — is clearly present.
 
 ---
 

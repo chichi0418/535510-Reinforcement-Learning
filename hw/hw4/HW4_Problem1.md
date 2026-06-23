@@ -73,8 +73,8 @@ from $\pi_{\text{ref}}$). This adaptive weighting is exactly what prevents the n
 
 Two stages cooperate:
 
-1. **Collation — `DataCollatorForPreference.torch_call()` (≈ line 150).** The prompt and each
-   completion are tokenized *separately*, then concatenated so that prompt tokens come first:
+1. **Collation — `DataCollatorForPreference.torch_call()`.** The prompt and each completion are
+   tokenized *separately*, then concatenated so that prompt tokens come first:
    ```python
    prompt_chosen_ids   = [ex["prompt_ids"] + ex["chosen_ids"]   for ex in examples]
    prompt_rejected_ids = [ex["prompt_ids"] + ex["rejected_ids"] for ex in examples]
@@ -83,7 +83,7 @@ Two stages cooperate:
    completion and builds a **completion mask** that is `1` only on response tokens (and `0` on prompt
    and padding tokens).
 
-2. **Forward + reduction — `compute_loss()` (≈ line 1190) → `concatenated_forward()`.** Chosen and rejected are
+2. **Forward + reduction — `compute_loss()` → `concatenated_forward()`.** Chosen and rejected are
    stacked into one batch and run through the model. Per-token log-probabilities of the *realized*
    next token are gathered, the prompt/padding positions are zeroed using the completion mask, and
    the remainder is **summed over the sequence dimension**:
@@ -99,8 +99,8 @@ Two stages cooperate:
 
 ### Question 2 — What survives truncation when `prompt+response` exceeds `max_length`
 
-Truncation is applied to the *concatenated* `prompt+completion` sequence inside `torch_call()`
-(≈ lines 152–165), controlled by `truncation_mode`:
+Truncation is applied to the *concatenated* `prompt+completion` sequence inside `torch_call()`,
+controlled by `truncation_mode`:
 ```python
 if self.truncation_mode == "keep_start":
     sl = slice(None, self.max_length)     # keep the FIRST max_length tokens
@@ -120,8 +120,8 @@ guarantees the prompt always stays intact; only overly long responses lose their
 ### Question 3 — Numerical stability of $\log\sigma(\cdot)$
 
 A literal implementation `torch.log(torch.sigmoid(x))` is unstable: for very negative `x`,
-`sigmoid(x)` underflows to `0` and `log(0) = -inf`. `DPOTrainer` (in `compute_loss()`, ≈ line 1280)
-instead uses PyTorch's fused, numerically stable primitive `F.logsigmoid`:
+`sigmoid(x)` underflows to `0` and `log(0) = -inf`. `DPOTrainer` instead uses PyTorch's fused,
+numerically stable primitive `F.logsigmoid`:
 ```python
 per_sequence_loss = -F.logsigmoid(self.beta * delta_score)
 ```
@@ -132,8 +132,7 @@ keeps the loss (and its gradient) finite and accurate across the full range of r
 ### Question 4 — What IPO actually does in implementation
 
 IPO (Identity/Implicit Preference Optimization, Azar et al.) replaces the log-sigmoid classification
-loss with a **squared-error regression** toward a fixed target. In the `loss_type == "ipo"` branch
-(≈ lines 1288–1299):
+loss with a **squared-error regression** toward a fixed target. In the `loss_type == "ipo"` branch:
 ```python
 chosen_avg_score   = chosen_scores   / chosen_mask.sum(dim=1).clamp(min=1.0)
 rejected_avg_score = rejected_scores / rejected_mask.sum(dim=1).clamp(min=1.0)
@@ -151,7 +150,7 @@ controlled KL deviation.
 ### Question 5 — How the reference policy is handled in practice
 
 The reference policy $\pi_{\text{ref}}$ is the frozen anchor in the reward $\hat r_\theta$. In
-`__init__()` (≈ lines 570–599 and 762–777) the trainer picks one of three strategies:
+`__init__()` the trainer picks one of three strategies:
 
 1. **Explicit `ref_model`** — if the user passes one, it is used directly (frozen).
 2. **Auto-created frozen copy (the common case, and what this HW uses)** — if `ref_model is None`

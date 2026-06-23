@@ -9,9 +9,7 @@ linkcolor: blue
 urlcolor: blue
 header-includes:
   - \usepackage{amsmath}
-  - \usepackage{amssymb}
   - \usepackage{newunicodechar}
-  - \newunicodechar{✓}{\ensuremath{\checkmark}}
   - \newunicodechar{≈}{\ensuremath{\approx}}
   - \newunicodechar{≳}{\ensuremath{\gtrsim}}
   - \newunicodechar{≥}{\ensuremath{\geq}}
