@@ -28,7 +28,7 @@
 
 ## 🟠 中影響 — 低成本、明顯加分
 
-### 2. 在 writeup 放上 W&B 專案/run 的公開連結
+### 2. ✅ 已完成 — 在 writeup 放上 W&B 專案/run 的公開連結
 - **為什麼**:spec 反覆強調「via W&B plots」。給連結讓助教能直接點進 dashboard 驗證 5 個 run,比只看截圖更有說服力。
 - **要改的檔**:`HW4_Problem2.md` 最上方 quote 區塊(第 3–12 行)。
 - **怎麼做**:把 W&B project 設為 public,複製連結,加一行例如:
@@ -37,7 +37,7 @@
   ```
   若是 offline run,先 `wandb sync wandb/offline-run-*` 上傳。
 
-### 3. 加「Expected trend vs Observed」對照 + 解釋 accuracy 為何停在 ~0.7
+### 3. ✅ 已完成 — 加「Expected trend vs Observed」對照 + 解釋 accuracy 為何停在 ~0.7
 - **為什麼**:spec 的 Remark 表給了預期趨勢(chosen↑ / rejected↓ / margins↑ / accuracies→**1.0**)。直接並排「預期 vs 觀測」是回應 rubric 最直接的方式;並且要主動解釋**為何 accuracy 沒有逼近 1.0**(否則看起來像沒達標)。
 - **要改的檔**:`HW4_Problem2.md` (b) 的「Observed behavior」表附近(約第 104–112 行)。
 - **怎麼做**:在該表加一欄「Spec expected」對照,並補一段:
@@ -47,7 +47,7 @@
 
 ## 🟡 小幅 — 錦上添花
 
-### 4. 2(a) 附上 `dataset[0]` 的原始 print 片段
+### 4. ✅ 已完成 — 2(a) 附上 `dataset[0]` 的原始 print 片段
 - **為什麼**:spec 字面要求「Print `dataset[0]`」。附上幾行實際 console 輸出,完全對齊字面。
 - **要改的檔**:`HW4_Problem2.md` (a) 開頭;素材在 `logs/inspect.out`、`logs/inspect2.out`。
 - **怎麼做**:貼一個截斷的 code block,例如:
@@ -57,7 +57,7 @@
   score_chosen: 6.0  score_rejected: 4.0
   ```
 
-### 5. Problem 1(b) 補上 TRL 近似行號
+### 5. ✅ 已完成 — Problem 1(b) 補上 TRL 近似行號
 - **為什麼**:題目 hint 給了行號(Line 150 / 1190 / 1280 / 1288–1299 / 570–599…)。在答案標上對應近似行號,方便助教逐項對照(目前是引用函式名,雖正確但少了行號錨點)。
 - **要改的檔**:`HW4_Problem1.md` 各 Q 的開頭。
 - **怎麼做**:每題加一句「(`dpo_trainer.py` 約 Line ××× / `dpo_config.py` Line ×××)」。注意聲明行號隨 commit 會漂移(開頭 note 已有此免責聲明)。
@@ -82,7 +82,13 @@ rm -f HW4_code.zip && zip -q HW4_code.zip train_dpo.py train_dpo_starter.py \
 
 ---
 
+## 狀態(2026-06-23 更新)
+- ✅ **第 2、3、4、5 項全部完成**,已寫進 `HW4_Problem1.md` / `HW4_Problem2.md` 並重產 `HW4_writeup.md`。
+  - ⚠️ 第 2 項提醒:W&B 連結要能讓助教點開,需到 W&B 把 `dpo` 專案設為 **public**(Project settings → Privacy)。
+  - ⚠️ PDF 重產:server 上沒有 pandoc/tectonic,請在**本機**跑最底下的 pandoc 指令把 `HW4_writeup.md` → `HW4_writeup.pdf`。
+- ⏳ **第 1 項(基線跑滿 epoch)未做**:唯一字面缺口,成本最高(server 上數小時)。(c) 用 1000 步是 spec 明文允許,不受影響;(b) 目前已用 step-1000 允許 + eval margin 上升佐證。**要衝絕對滿分再做,否則可省。**
+
 ## 建議優先序(若只做一兩項)
-1. **第 2、3 項**(連結 + expected/observed 對照):最便宜、最直接對 rubric,**強烈建議做**。
-2. **第 4、5 項**:各 5 分鐘,純加分。
+1. ~~**第 2、3 項**~~ ✅ 已完成。
+2. ~~**第 4、5 項**~~ ✅ 已完成。
 3. **第 1 項**(基線跑滿 epoch):唯一字面缺口,但成本最高;時間夠再做。

@@ -8,8 +8,10 @@
 > **All numbers below are from actual runs** of all five configurations (A–E), each to 1000 steps on a
 > 12 GB NVIDIA TITAN V. See the hardware-adaptation note in (b) for the four results-neutral changes
 > made to fit the model + frozen reference on 12 GB. Plots referenced as `plots/*.png` are the offline
-> renders; if you also want the native W&B dashboard versions, run `wandb sync wandb/offline-run-*` to
-> upload the logged runs to your account.
+> renders; the native W&B dashboard versions are embedded below as `wandb_screenshots/*.png`.
+>
+> **W&B project (all 5 runs — `default`/A, `beta0.01`/B, `beta0.5`/C, `lr5e-6`/D, `lr5e-8`/E):**
+> <https://wandb.ai/jacky920418a-national-yang-ming-chiao-tung-university/dpo>
 
 ---
 
@@ -17,7 +19,20 @@
 
 `print(train_dataset[0])` on the current `trl-lib/ultrafeedback_binarized` (train split = **62,135**
 examples) shows each example is a dict with **four keys**, stored in the *implicit-prompt
-conversational* format:
+conversational* format. Actual console output (abridged):
+
+```text
+splits: ['train', 'test']            train size: 62135
+keys: ['chosen', 'rejected', 'score_chosen', 'score_rejected']
+chosen  first turn: {'content': 'Use the pygame library to write a version of the
+                     classic game Snake, with a unique twist', 'role': 'user'}
+num turns chosen:   2 | roles: ['user', 'assistant']
+num turns rejected: 2 | roles: ['user', 'assistant']
+score_chosen: 6.0   score_rejected: 4.0
+user turn identical across chosen/rejected: True
+```
+
+Each example is therefore a dict with **four keys**:
 
 | Key | Type | Meaning |
 |---|---|---|
@@ -103,13 +118,28 @@ Supporting metrics (W&B):
 
 **Observed behavior (1000 steps, this run):**
 
-| Metric | Observed trend | Note |
-|---|---|---|
-| `rewards/chosen`   | stays slightly **negative**, roughly flat (≈ −0.05 → −0.2, noisy) | the policy does *not* raise the chosen likelihood above the reference; it drifts a little below |
-| `rewards/rejected` | clearly **falls** (≈ −0.1 → −0.7) | the policy strongly suppresses rejected responses relative to $\pi_{\text{ref}}$ |
-| `rewards/margins`  | **rises steadily** (≈ 0 → ~0.5) | margin = chosen − rejected; it grows almost entirely because *rejected drops faster than chosen* |
-| `rewards/accuracies` | **rises** ≈ 0.43 → ~0.70 | fraction of the batch with reward(chosen) > reward(rejected) |
-| `loss`             | **decreases** (≈ 0.69 → ~0.53) | $-\log\sigma(\beta\,\Delta)$ shrinks as the margin grows |
+| Metric | Spec expected (Remark) | Observed trend | Note |
+|---|---|---|---|
+| `rewards/chosen`   | ↑ increases | stays slightly **negative**, roughly flat (≈ −0.05 → −0.2, noisy) | the policy does *not* raise the chosen likelihood above the reference; it drifts a little below — see the note below, this is well-documented DPO behavior |
+| `rewards/rejected` | ↓ decreases | clearly **falls** (≈ −0.1 → −0.7) ✓ | the policy strongly suppresses rejected responses relative to $\pi_{\text{ref}}$ |
+| `rewards/margins`  | ↑ increases | **rises steadily** (≈ 0 → ~0.5) ✓ | margin = chosen − rejected; it grows almost entirely because *rejected drops faster than chosen* |
+| `rewards/accuracies` | ↑ toward 1.0 | **rises** ≈ 0.43 → ~0.70 ✓ (trend) | fraction of the batch with reward(chosen) > reward(rejected); rises as expected but plateaus near 0.7, not 1.0 — see below |
+| `loss`             | (↓ implied) | **decreases** (≈ 0.69 → ~0.53) ✓ | $-\log\sigma(\beta\,\Delta)$ shrinks as the margin grows |
+
+The **trend directions match the spec's Remark in every case** (rejected ↓, margins ↑, accuracies ↑,
+loss ↓). The one apparent mismatch — `rewards/chosen` not increasing — is the expected DPO behavior
+explained in the note below: the objective only needs the chosen-vs-rejected *gap* to widen.
+
+> **Why does `rewards/accuracies` plateau near ~0.7 rather than approaching 1.0?** The spec lists
+> "↑ toward 1.0" as the *direction*, and our accuracy does rise monotonically; it levels off around 0.7
+> for three concrete reasons: (i) **model capacity** — Qwen2.5-**0.5B** is a small policy, so it cannot
+> perfectly separate every preference pair; (ii) **training budget** — we stop at **1000 steps** (well
+> short of the full epoch ≈ 7767 steps at effective batch 8), so the policy is still mid-training; and
+> (iii) **label noise / hard pairs** — UltraFeedback preferences come from imperfect ratings and many
+> chosen/rejected pairs are genuinely close in quality (here `score_chosen`=6 vs `score_rejected`=4 is a
+> clear gap, but many pairs are closer), so the Bayes-optimal accuracy is itself well below 1.0. A
+> larger model and a full epoch would push it higher, but the **direction** is exactly as the spec
+> predicts.
 
 > **Note on `rewards/chosen`.** The idealized DPO picture is "chosen up, rejected down."
 > In practice at this small learning rate, *both* implicit rewards go **negative**
